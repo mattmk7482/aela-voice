@@ -13,7 +13,7 @@ Ships with **Aela** — warm, direct, invested in your work. Backed by any XTTS-
 ## Install
 
 ```bash
-claude plugin add github:<your-handle>/aela-voice
+claude plugin add github:mattmk7482/aela-voice
 ```
 
 You'll be prompted for:

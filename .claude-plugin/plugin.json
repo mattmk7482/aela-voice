@@ -5,6 +5,8 @@
   "author": {
     "name": "Matt Bushell"
   },
+  "homepage": "https://github.com/mattmk7482/aela-voice",
+  "repository": "https://github.com/mattmk7482/aela-voice",
   "license": "MIT",
   "keywords": ["voice", "tts", "personality", "companion"],
   "userConfig": {
