@@ -1,0 +1,22 @@
+{
+  "name": "aela-voice",
+  "version": "1.0.0",
+  "description": "Give Claude a voice and companion personality. Ships with Aela — warm, direct, invested in your work. Backed by any XTTS-compatible TTS server.",
+  "author": {
+    "name": "Matt Bushell"
+  },
+  "license": "MIT",
+  "keywords": ["voice", "tts", "personality", "companion"],
+  "userConfig": [
+    {
+      "key": "ttsServerUrl",
+      "description": "Your XTTS TTS server URL (e.g. http://192.168.1.247:8020)",
+      "required": true
+    },
+    {
+      "key": "userName",
+      "description": "Your first name — used to personalise the companion",
+      "required": true
+    }
+  ]
+}
