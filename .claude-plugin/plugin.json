@@ -7,16 +7,18 @@
   },
   "license": "MIT",
   "keywords": ["voice", "tts", "personality", "companion"],
-  "userConfig": [
-    {
-      "key": "ttsServerUrl",
+  "userConfig": {
+    "ttsServerUrl": {
+      "title": "TTS Server URL",
       "description": "Your XTTS TTS server URL (e.g. http://192.168.1.247:8020)",
+      "type": "string",
       "required": true
     },
-    {
-      "key": "userName",
+    "userName": {
+      "title": "Your Name",
       "description": "Your first name — used to personalise the companion",
+      "type": "string",
       "required": true
     }
-  ]
+  }
 }
