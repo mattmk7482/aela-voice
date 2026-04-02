@@ -1,6 +1,6 @@
 {
   "tts": {
     "command": "node",
-    "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-servers/tts/server.js"]
+    "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-servers/tts/start.js"]
   }
 }
