@@ -2,7 +2,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = join(__dirname, '..');
@@ -20,7 +20,7 @@ if (!existsSync(join(MCP_DIR, 'node_modules'))) {
 // Check if aela-default voice exists on the XTTS server. If not, upload it.
 
 const { getTtsUrl } = await import(
-  join(MCP_DIR, 'config.js').replace(/\\/g, '/')
+  pathToFileURL(join(MCP_DIR, 'config.js')).href
 );
 
 const ttsUrl = getTtsUrl();
@@ -39,10 +39,10 @@ try {
 // ── 3. Inject personality ───────────────────────────────────────────────────
 
 const { buildPersonality } = await import(
-  join(MCP_DIR, 'personality.js').replace(/\\/g, '/')
+  pathToFileURL(join(MCP_DIR, 'personality.js')).href
 );
 const { getUserName } = await import(
-  join(MCP_DIR, 'config.js').replace(/\\/g, '/')
+  pathToFileURL(join(MCP_DIR, 'config.js')).href
 );
 
 const userName = getUserName();
