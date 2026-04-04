@@ -192,15 +192,14 @@ async function handleTool(name, args) {
 
     case 'get_personality': {
       const { companionName, personality } = readPersonality(PLUGIN_ROOT);
-      const indented = personality.replace(/^/gm, '  ');
-      return text(`companionName: ${companionName}\npersonality: |\n${indented}`);
+      return text(`companionName: ${companionName}\n\n${personality}`);
     }
 
     case 'update_personality': {
       const current = readPersonality(PLUGIN_ROOT);
       writePersonality(PLUGIN_ROOT, {
-        companionName: args.companionName ?? current.companionName,
-        personality: args.personality ?? current.personality,
+        companionName: args.companionName || current.companionName,
+        personality: args.personality || current.personality,
       });
       return text('Personality updated. Changes take effect next session.');
     }
