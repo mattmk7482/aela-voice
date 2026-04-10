@@ -264,6 +264,34 @@ Resolved: **`<project>/.aela-wiki/`**. Hidden but accessible, fits the establish
 
 The core `/check-comms` skill owns only the *shape* — scan priority sources, extract tasks/decisions/knowledge, update wikis, return brief summary. Everything else (which services, which channels, priorities, service-specific quirks the agent learned) lives in `comms-sources`. New services added by re-running `/comms-init` and walking through the flow — no plugin updates needed.
 
+#### Why adapter files were wrong — reasoning trail
+
+This subsection captures the reasoning behind rejecting static adapter files, so future-me (or another Claude working on this migration) doesn't re-propose them and doesn't have to re-derive why they fail.
+
+**The first adapter-files proposal tried to separate:**
+- *Service knowledge* (plugin-owned, shipped as `sources/teams.md`, `sources/slack.md`, etc.) — DOM quirks, auth-state detection, scroll mechanics, navigation recipes, known gotchas.
+- *User knowledge* (user-owned, lived in `comms-sources` wiki page) — which channels matter, priority rankings, per-user navigation learnings.
+
+**Four reasons the split doesn't hold up:**
+
+1. **The content is genuinely thin.** Once you actually try to write `sources/teams.md`, most of what you want to say is either (a) obvious from looking at the page ("Teams sidebar is on the left"), (b) service quirks that change when the service updates its UI (brittle), or (c) user-specific ("which chats are priority"). None of it is a meaty abstraction that warrants a dedicated file. A thin abstraction is worse than no abstraction — it implies structure where there isn't any.
+
+2. **The agent can discover service quirks in real time.** First time a Claude instance opens Teams, it notices the SPA hydration delay, figures out that screenshots beat DOM extraction, and learns the scroll-5-ticks pattern by trying and observing. All of this can be written into `comms-sources` as learnings after the first successful scan. The agent doesn't need a pre-written recipe — it needs an environment where it can learn cheaply and persist what it learned. That environment already exists (the wiki).
+
+3. **Pre-seeding doesn't justify a separate abstraction.** The "new user first-run" argument for adapter files says: "but a fresh install wouldn't know that Teams is SPA-brittle without an adapter." Counter: the init skill (`/comms-init`) can seed the user's `comms-sources` wiki with a few starter hints about each service the user says they use. That's pre-seeding ordinary wiki content, not a new file shape. No adapter abstraction needed — just slightly smarter init seeding.
+
+4. **User context is fundamentally not generalisable.** The thing that actually matters for a comms scan — "which conversations should I care about?" — cannot be answered by looking at the service. You have to ask the user, look at their workspace, and let them tell you which channels are signal and which are noise. No plugin-level adapter can know this in advance. So the interesting work *has* to happen at onboarding time, not at plugin-ship time.
+
+**The core insight:** the Navigate-And-Understand work must happen *when the user is present*, not at plugin-ship time. That's socratic onboarding, not static adapters. Once you see it that way, the agent opening the tab, looking at it, and asking pointed questions is obviously the right shape — the agent is doing the work a human integrator would do, guided by the user who actually knows their own context.
+
+**What this means architecturally:**
+- The `/check-comms` skill has ONE shape (read `comms-sources` for config, scan each configured source, extract, classify, update wikis). It's the same shape for every user.
+- All the per-user config lives in `comms-sources` (user-owned, user-editable).
+- All the service-quirk knowledge accumulates in `comms-sources` as learnings.
+- Adding a new service (Discord, Basecamp, Gmail, whatever) is a matter of re-running `/comms-init` and walking through the onboarding once — the user tells me what they use, I open it, I look, I ask, I write to `comms-sources`. No plugin update required.
+
+**If someone in the future is tempted to add `sources/<service>.md` files:** re-read this reasoning. The answer is the wiki, not a new abstraction. The only reason to ship static service content is if a service requires authentication flows or API tokens that can't be discovered at runtime — at which point it's not an "adapter" anymore, it's a dedicated MCP tool, and belongs as its own plugin.
+
 See the **Init Skills** section below for the full `/comms-init` flow.
 
 ### D. ~~Multi-project personal wiki write conflicts~~ — RESOLVED 2026-04-10
