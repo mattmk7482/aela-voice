@@ -38,16 +38,22 @@ Insert after `## How I Care`:
 
   Before I answer any question about a project, codebase, person, task, preference, or ongoing initiative, I read the relevant wiki page. Not "if I'm unsure" — always. The cost of a wiki read is tiny compared to the cost of a shallow or wrong answer. If I catch myself about to answer from memory alone, I stop and read first.
 
+  ### The index is my navigation layer
+
+  Each wiki has an auto-generated index where every page carries a genuine one-line description of what's in it — not a title echo. The index is the catalog. My first move on any unfamiliar topic is to scan the index, spot the right page from its description, then `wiki_read` that page to drill in. I don't guess page names and I don't blindly `wiki_search` for keywords when the index would point me straight at the answer.
+
   Concretely:
-  - Question about a domain or codebase → `wiki_read` the domain page first
-  - Question about a person → `wiki_read` the people page or search by name
-  - Question about what's next, priorities, status → `wiki_read` the active tasks page
-  - Question about how {{userName}} works, tone, autonomy → `wiki_read` their preferences page
-  - Any fuzzy topic → `wiki_search` before forming an answer
+  - Question about a domain or codebase → scan the codebase index, then `wiki_read` the right page
+  - Question about a person → scan the aela index for the people page, then read it
+  - Question about what's next, priorities, status → already loaded at session start (active tasks page), no read needed
+  - Question about how {{userName}} works, tone, autonomy → already loaded at session start (preferences page)
+  - Any fuzzy topic the index doesn't resolve → `wiki_search` as fallback, not first move
 
   ### Writing is how the wiki grows
 
   After completing real work — a bug fix, a feature, an exploration, a conversation that revealed something — I update the wiki. Implementation knowledge (what I discovered from reading actual code) is the most valuable content because it prevents re-discovery next time. Specs describe intent; code reveals reality. I write down the reality.
+
+  Every page I write or update carries a meaningful one-line `description:` in its frontmatter — a genuine summary of what's in the page, not a restatement of the title. The description is what shows up in the index, and a vague description means a future session can't find the page. If I can't write a sharp description, I don't understand the page well enough to be writing it.
 
   When I update a page, I also ask: does this affect other pages? A discovery about a backend contract probably touches multiple domain pages. I cross-reference, not just dump-and-forget.
 
@@ -137,9 +143,15 @@ Add this short clause to the `How I Remember` section so the prompt handles fres
 
 ### 6. Hooks and scheduled maintenance
 
-- The plugin's existing `hooks/session-start.js` can be extended to run a wiki-maintenance pass on session start: check the project's `docs/analysis/` + `docs/superpowers/` for un-ingested sources and surface them as flags.
-- `/check-comms` (once generalised) continues as a scheduled cron via the subagent pattern (see the "Running on a Loop — Subagent Pattern" section in matt-head's `wiki/codebase/pages/aela-voice.md`).
-- The subagent-doesn't-inherit-CLAUDE.md gotcha should be documented in the plugin README so it affects users scheduling any delegated work, not just comms.
+matt-head validated a three-hook pattern on 2026-04-13 (see `wiki-discipline-hooks` plan). The plugin should port all three:
+
+- **`hooks/session-orient.js` (SessionStart)** — reads both wiki indexes + the three always-loaded orientation pages (`tasks-active`, `team-state`, `working-preferences`) from disk and emits them as `additionalContext` in Claude Code's JSON hook output. Also injects the comms-cron prompt for rescheduling (Claude Code crons die on session exit). Parameterised by `AELA_WIKI_ROOT` / `CODEBASE_WIKI_ROOT` env vars so the same script works for both the matt-head paths and the plugin defaults (`~/.claude/aela-wiki/` + `<cwd>/.aela-wiki/`). This is what makes the "index is my navigation layer" promise in `How I Remember` actually land — the model has both indexes in context before it touches a tool.
+
+- **`hooks/wiki-maintenance.js` (SessionStart)** — flags un-ingested sources (superpowers specs/plans, analysis docs) across all configured project paths. Composes with `session-orient.js`; multiple SessionStart hook entries all run.
+
+- **`hooks/stop-reflect.js` (Stop)** — blocks the first stop of each sequence with a reflection prompt asking whether anything from the turn is worth persisting. Uses the `stop_hook_active` input flag as the loop guard. The reflection prompt content is **not hardcoded in the hook** — the hook payload is a minimal one-liner that tells Claude to `wiki_read(wiki: 'aela', page: 'wiki-stop-hook')` and follow the page. The actual prompt lives as a wiki page shipped in the personal wiki template, so users customise by editing markdown, not JS. Same pattern applies to any other hook that needs guidance text: put the content in a wiki page, point the hook at it. Validated in matt-head 2026-04-13.
+
+- **Subagent cron** — `/check-comms` (once generalised) runs as a scheduled cron via the subagent pattern (see the "Running on a Loop — Subagent Pattern" section in matt-head's `wiki/codebase/pages/aela-voice.md`). The subagent-doesn't-inherit-CLAUDE.md gotcha and the subagent-hallucinates-deferred-tool-refusals gotcha both belong in the plugin README so they affect users scheduling any delegated work.
 
 ## Init Skills
 
@@ -329,6 +341,9 @@ See the **Init Skills** section below for the full `/comms-init` flow.
 1. **Phase 0 — Preparation (this doc)**: lock the primary prompt addition, lock the MCP server split shape, resolve the open questions (A–D all now resolved as of 2026-04-10). No code changes.
 2. **Phase 1 — Componentise MCP servers**:
    - Create `mcp-servers/wiki/server.js` by extracting wiki tools from `matt-head/src/mcp-server.js`. Dual-root support: personal (global, defaulting to `~/.claude/aela-wiki/`) + work (project-cwd, defaulting to `<cwd>/.aela-wiki/`). Both paths overridable via plugin options.
+   - Port `src/wiki/store.js` as-is — the index generator already honours `fm.description` as a separate field from `fm.title`, which is the mechanic that makes the auto-generated index usable as a navigation layer. Don't collapse description into title during the port.
+   - Port the `wiki_write` tool description from `src/mcp-tools.js` verbatim — it instructs the caller to supply a meaningful one-line `description:` framed around "what's in the page" and "when would a reader drill in", not a title echo. This framing is load-bearing: without it, descriptions regress to title echoes within a few sessions and the index stops being useful. The tool description is the only enforcement mechanism — there is no runtime validator — so it has to ship as part of Phase 1, not as an afterthought.
+   - Ship a default `wiki-stop-hook` page in the personal wiki template so the `stop-reflect.js` hook has something to point at on a fresh install.
    - Create `mcp-servers/comms/server.js` if the generalised comms skill needs any state tools. May be empty initially.
    - Register both in `.mcp.json` alongside the existing TTS server.
 3. **Phase 1.5 — Add advisory file locking to wiki MCP server** (**hard prerequisite for Phase 6b**):
