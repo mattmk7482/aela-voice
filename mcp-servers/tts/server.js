@@ -64,6 +64,11 @@ const TOOLS = [
     },
   },
   {
+    name: 'get_voice',
+    description: 'Get the currently-configured TTS voice from the plugin\'s local settings. Does not require the TTS server to be reachable.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
     name: 'upload_voice_sample',
     description: 'Upload a WAV file to the TTS server for voice cloning.',
     inputSchema: {
@@ -113,12 +118,14 @@ const TOOLS = [
   },
   {
     name: 'update_personality',
-    description: 'Update personality fields. Changes take effect next session.',
+    description: 'Update personality fields. Changes take effect next session. Any field omitted from the call is preserved at its current value.',
     inputSchema: {
       type: 'object',
       properties: {
-        companionName: { type: 'string', description: 'The companion character name' },
+        user_name: { type: 'string', description: 'The user\'s name — substituted for {{userName}} in the personality template' },
+        companionName: { type: 'string', description: 'The companion character name — substituted for {{companionName}} in the personality template' },
         personality: { type: 'string', description: 'The full personality markdown template. Use {{userName}} and {{companionName}} as placeholders.' },
+        how_i_remember: { type: 'string', description: 'The wiki-memory disposition block, appended to the personality as a "## How I Remember" subsection' },
       },
     },
   },
@@ -153,6 +160,11 @@ async function handleTool(name, args) {
     case 'set_voice': {
       setVoice(PLUGIN_ROOT, args.voice);
       return text(`Voice set to: ${args.voice}`);
+    }
+
+    case 'get_voice': {
+      const current = getVoice(PLUGIN_ROOT);
+      return text(current);
     }
 
     case 'upload_voice_sample': {
@@ -191,15 +203,22 @@ async function handleTool(name, args) {
     }
 
     case 'get_personality': {
-      const { companionName, personality } = readPersonality(PLUGIN_ROOT);
-      return text(`companionName: ${companionName}\n\n${personality}`);
+      const { userName, companionName, personality, howIRemember } = readPersonality(PLUGIN_ROOT);
+      return text(
+        `user_name: ${userName || '(unset)'}\n` +
+        `companionName: ${companionName}\n\n` +
+        `## personality\n\n${personality}\n\n` +
+        `## how_i_remember\n\n${howIRemember || '(unset)'}\n`
+      );
     }
 
     case 'update_personality': {
       const current = readPersonality(PLUGIN_ROOT);
       writePersonality(PLUGIN_ROOT, {
-        companionName: args.companionName || current.companionName,
-        personality: args.personality || current.personality,
+        userName:      args.user_name      !== undefined ? args.user_name      : current.userName,
+        companionName: args.companionName  !== undefined ? args.companionName  : current.companionName,
+        personality:   args.personality    !== undefined ? args.personality    : current.personality,
+        howIRemember:  args.how_i_remember !== undefined ? args.how_i_remember : current.howIRemember,
       });
       return text('Personality updated. Changes take effect next session.');
     }
