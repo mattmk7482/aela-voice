@@ -8,18 +8,18 @@ status: draft
 
 ## Context
 
-v2.0.0 Phases 1, 2, 3a, and 3b have shipped. Matt tested the full clean-install flow into `matt-head-test/` and the onboarding completed successfully — the personal wiki populated, `/aela-init` + `/wiki-init` ran, the contract pages exist. The install works.
+v2.0.0 Phases 1 through 5 have shipped — the wiki MCP server, the hooks port, both sub-phases of the skills layer, the personality + PLUGIN-FEATURES.md work, and the README rewrite are all in main. Only Phase 6 (Matt migration / canary) remains from the original v2.0.0 scope. Matt tested the full clean-install flow into `matt-head-test/` and the onboarding completed successfully — the personal wiki populated, `/aela-init` + `/wiki-init` ran, the contract pages exist. The install works.
 
 Testing surfaced ten notes (`matt-head-test/notes.txt`) covering UX polish, first-run hand-holding, a turn-end voice calibration problem, an ambiguous `sources.md` lifecycle, and a silent half-init bug in `/wiki-init` where the project wiki directory is never created.
 
 This spec covers the polish pass that blocks distribution of v2.0.0. No new features. No architectural change. Targeted edits to existing skills, hooks, and one store helper.
 
-**Phase slot:** Phase 3c — install polish pass, between 3b and Phase 4.
+**Phase slot:** Phase 5.5 — install polish pass, between the shipped Phase 5 and the final Phase 6 canary. Blocks distribution of v2.0.0.
 
 ## Out of scope
 
 - Any new feature. Any migration work. Any change to the spec's locked decisions from the parent v2.0.0 design doc (`2026-04-14-wiki-migration-design.md`).
-- Phase 4–6 work.
+- Phase 6 canary work (that's the phase this polish pass unblocks, not replaces).
 - The deferred Phase 7 split-session comms launcher.
 
 ## Ten notes → design
