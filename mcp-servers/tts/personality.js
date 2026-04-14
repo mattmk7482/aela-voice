@@ -23,6 +23,7 @@ export function readPersonality(pluginRoot) {
     userName: doc?.user_name || '',
     companionName: doc?.companionName ?? 'Aela',
     personality: doc?.personality ?? '',
+    howIRemember: doc?.how_i_remember ?? '',
   };
 }
 
@@ -47,6 +48,7 @@ export function writePersonality(pluginRoot, patch) {
   if ('userName' in patch) doc.user_name = patch.userName || '';
   if ('companionName' in patch) doc.companionName = patch.companionName;
   if ('personality' in patch) doc.personality = patch.personality;
+  if ('howIRemember' in patch) doc.how_i_remember = patch.howIRemember;
 
   writeFileSync(USER_PERSONALITY_PATH, YAML.stringify(doc), 'utf-8');
 }
@@ -54,11 +56,23 @@ export function writePersonality(pluginRoot, patch) {
 /**
  * Build the final personality text with placeholders resolved.
  * If userName is not passed, reads it from the personality file.
+ *
+ * Concatenates the personality block with how_i_remember as a
+ * "## How I Remember" subsection so the full disposition (including
+ * the wiki-memory framing) lands in the session-start injection.
  */
 export function buildPersonality(pluginRoot, userName) {
-  const { userName: fileUserName, companionName, personality } = readPersonality(pluginRoot);
+  const {
+    userName: fileUserName,
+    companionName,
+    personality,
+    howIRemember,
+  } = readPersonality(pluginRoot);
   const name = userName || fileUserName || 'friend';
-  return personality
+  const combined = howIRemember
+    ? `${personality}\n\n## How I Remember\n\n${howIRemember}`
+    : personality;
+  return combined
     .replace(/\{\{companionName\}\}/g, companionName)
     .replace(/\{\{userName\}\}/g, name);
 }
