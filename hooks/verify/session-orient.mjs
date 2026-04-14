@@ -48,7 +48,9 @@ if (coldResult) {
   check('cold start: additionalContext is a string', typeof coldResult.hookSpecificOutput?.additionalContext === 'string');
   const ctx = coldResult.hookSpecificOutput?.additionalContext || '';
   check('cold start: personal wiki index placeholder present', /Personal Wiki/i.test(ctx) || /empty/.test(ctx));
-  check('cold start: no User is called line (personality absent)', !/User is called/.test(ctx));
+  // Match the start-of-line form session-orient emits ("User is called X."),
+  // not the quoted reference to the feature inside PLUGIN-FEATURES.md documentation.
+  check('cold start: no User is called line (personality absent)', !/^User is called [^.\n]+\./m.test(ctx));
   check('cold start: no PLUGIN-FEATURES section (file absent)', !/PLUGIN-FEATURES/.test(ctx));
 }
 
