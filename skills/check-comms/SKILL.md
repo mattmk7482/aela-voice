@@ -1,112 +1,70 @@
 ---
 name: check-comms
-description: Scan Teams and Slack for new tasks, decisions, and knowledge. Extracts action items into the Aela wiki and technical insights into the codebase wiki. Self-improving — learns which channels matter and how to navigate efficiently.
+description: Scan the user's configured communication services for new tasks, decisions, and knowledge. Extracts findings into the personal and project wikis. Shape-only — all service-specific configuration (which services, which channels, navigation hints) lives in the user's comms-sources wiki page, populated by /comms-init.
 ---
 
 # Check Communications
 
-Scan Microsoft Teams and Slack for new messages, extract tasks and knowledge, and update the wikis.
+Scan each communication service the user has configured for new messages since the last check, extract tasks and knowledge, and route findings to the right wiki pages.
 
-## Before Starting
+This skill is **shape-only**. It does not know about any specific service. It reads its configuration from the user's `comms-sources` wiki page, which was populated by the `/comms-init` skill during onboarding. If you want to add a new service, re-run `/comms-init`.
 
-1. Load the hints page: call `wiki_read(wiki: "aela", page: "comms-sources")` to get navigation hints, channel priorities, and learnings from previous runs.
-2. Load the work queue: call `wiki_read(wiki: "aela", page: "tasks-active")` to know what's already committed for the user — avoid duplicating their own tasks.
-3. Load team state: call `wiki_read(wiki: "aela", page: "team-state")` to know what other people are already tracked as doing — avoid duplicate team-state entries.
+## Before starting
 
-## Process
+1. **Load the configuration** — call `wiki_read(wiki: "personal", page: "comms-sources")`. This page contains:
+   - The list of services the user has configured
+   - For each service: opening instructions, sidebar/list navigation pattern, priority rules (always-check vs if-unread vs skip), extraction targets, scan-tracking timestamps from the last run, and any learnings from previous runs
+   - If the page does not exist, stop. Report: "No comms configured — run /comms-init to set up communication services for scanning." Do not continue.
+2. **Load the user's work queue** — call `wiki_read(wiki: "personal", page: "tasks-active")`. You need this to avoid duplicating items the user has already committed to.
+3. **Load team state** — call `wiki_read(wiki: "personal", page: "team-state")`. You need this to avoid duplicating team members' activity you already know about.
+4. **Load user profile** — call `wiki_read(wiki: "personal", page: "user-profile")`. You need this to correctly route "learned something about the user" findings.
 
-### 1. Check Teams
+Every piece of service-specific knowledge needed for scanning is in `comms-sources`. If you find yourself wanting to hardcode a URL, a sidebar pattern, a chat-name convention, or a priority rule in this skill — stop. That knowledge belongs in `comms-sources` instead, and `/comms-init` is how it gets there.
 
-Use the Chrome extension tools (`mcp__claude-in-chrome__*`). Teams should already be open — check `tabs_context_mcp` for an existing Teams tab. If not, create one and navigate to `https://teams.microsoft.com/v2/`.
+## The shape of a scan
 
-For each "Always Check" chat listed in `comms-sources` — check every run regardless of unread status. The user reads their own Teams, so don't rely on unread indicators for priority chats.
+For each service configured in `comms-sources`:
 
-For each "Check If Unread" chat — only scan if unread indicators are visible in the sidebar.
-Skip "Skip Unless Asked" chats.
+1. **Open the service** using the instructions written in `comms-sources` for that service. This might involve checking for an existing tab via `mcp__claude-in-chrome__tabs_context_mcp`, creating one if absent, and navigating to the URL the user's configuration specifies.
+2. **Respect the priority rules.** `comms-sources` groups channels or conversations into tiers (typically some variant of always-check, check-if-unread, and skip-unless-asked). Process tiers in order. For always-check sources, do not rely on unread indicators — the user may have read the messages themselves. For if-unread sources, skip unless visible unread indicators are present.
+3. **For each target being checked**, use the per-service navigation hints in `comms-sources` to reach it. Take a screenshot if that helps you extract structured content. Compare message timestamps against the scan-tracking timestamps stored in `comms-sources` for that target — only process messages newer than the last scan.
+4. **Extract findings.** Each message or thread may contain:
+   - **Tasks / action items** — anything the user committed to do, was asked to do, or mentioned they'd do
+   - **Decisions** — technical or business decisions
+   - **Knowledge** — architecture, requirements, domain insight
+   - **People context** — new team members, role changes, relationship shifts
+5. **Update scan-tracking in `comms-sources`** after processing a target, so the next run knows where to resume. This is an Edit to the `comms-sources` page — use the `/wiki-update` skill.
 
-For each chat being checked:
+## Routing findings
 
-1. Click the chat name in the left sidebar
-2. Wait briefly for messages to load
-3. Screenshot the visible messages
-4. Compare message timestamps against the "Scan Tracking" timestamps in `comms-sources` — only process messages newer than the last scan
-5. Scroll down and screenshot again if needed, until you reach already-seen timestamps
-6. Extract:
-   - **Tasks/action items** — anything assigned to the user or the team, deadlines, deliverables
-   - **Decisions** — technical or business decisions that affect the codebase
-   - **Knowledge** — technical analysis, architecture discussions, requirements
-   - **People context** — who said what, new team members, role clarifications
-7. Update the "Scan Tracking" timestamp in `comms-sources` after processing
+After extracting, route each finding to the right wiki page. Use `/wiki-update` for existing pages and `wiki_create` for new ones.
 
-#### Call & Meeting Transcripts
+| Finding type | Destination |
+|---|---|
+| User committed to do it | `tasks-active` (Now or Next section) |
+| User mentioned it, not committed | `tasks-active` (Watch section) with `Captured: <date>` |
+| User is waiting on someone | `tasks-active` (Blocked section) |
+| Someone else's current activity | `team-state` (that person's section) |
+| Multi-person thread with no single owner | `team-state` (Active multi-person threads) |
+| Something you learned about the user as a person | `user-profile` or `working-preferences`, depending on whether it's structural or an interaction preference |
+| Technical decision about the current project | A page in the project wiki (create via `wiki_create` if no existing page fits) |
+| New person entering the user's orbit | `people` page (create if absent) |
+| Service-specific learning (navigation quirks, priority updates) | `comms-sources` — this is how the skill gets smarter over time |
 
-When you see a call/meeting indicator in a Teams chat (e.g. "Call ended", meeting summary card, or a transcript attachment):
+If a finding doesn't fit any of these, default to `tasks-active` (Watch) or leave it out of the wiki if it's ephemeral noise.
 
-1. Click the meeting/call entry to open details
-2. Look for a "Transcript" tab or download link — Teams auto-generates `.vtt` transcripts for recorded calls
-3. If a transcript is available:
-   - Download the `.vtt` file to `temp/transcripts/`
-   - Read and extract: tasks, decisions, technical knowledge, people context
-   - Update relevant wiki pages (same as message extraction)
-   - Note the call topic and participants in the scan report
-4. If no transcript is available (short call, recording disabled), note that a call happened and what you can infer from surrounding messages
+## What to return
 
-This replaces the previous manual process where Matt had to tell us about transcripts. The comms skill should catch them automatically.
+After scanning every configured service, return a **brief text summary**: 3 to 5 lines max. Include:
 
-### 2. Check Slack
+- Total new items found, split by destination page
+- Any urgent flags (the user is waiting on something, a deadline is close, a decision is contested)
+- Any surprises or things worth the user's attention
 
-Navigate to Slack tab or create one at `https://app.slack.com`. Check workspaces listed in `comms-sources`.
+**Do NOT include** screenshots, raw message logs, extraction tables, or verbose reasoning in the summary. Those stay in your scanning context and do not propagate to the parent conversation.
 
-Same extraction process — focus on channels with unread messages.
+If nothing new: say so in one line and stop.
 
-### 3. Update Wikis — routing rules
+## Self-improvement
 
-Use these classification rules to decide which wiki page each piece of new information goes to. When in doubt, be conservative and place items in the user's `tasks-active` Watch section rather than auto-routing to the wrong page.
-
-| Finding | Destination page | Section |
-|---|---|---|
-| User explicitly committed to do something | `tasks-active` | Now (if immediate) or Next |
-| Something was discussed that the user might want to do but didn't commit | `tasks-active` | Watch (with **Captured:** YYYY-MM-DD) |
-| The user is waiting on someone to unblock them | `tasks-active` | Blocked (note what + who) |
-| The user finished something | `tasks-active` | Done (recent) — mark with `[x]` |
-| Someone else is doing something the user should be aware of | `team-state` | that person's section |
-| An ongoing multi-person thread changed state | `team-state` | Active multi-person threads |
-| A new person or role was discovered | `people` | appropriate team grouping |
-| A strategic opportunity, deal, or pipeline update | `opportunities` | Deals / Product Bets / Experiments |
-| A technical decision about a codebase was discussed | relevant codebase wiki page | domain page |
-| A new scan-tracking timestamp | `comms-sources` | Scan Tracking |
-| A learning about navigation / channel quirks | `comms-sources` | Learning Notes |
-
-**Rules:**
-- Never remove completed tasks from `tasks-active` — mark them `[x]` and leave them in Done (recent). Items older than 2 weeks get archived during periodic cleanup.
-- Watch-section items MUST have a `Captured:` date so the 14-day stale-review rule is enforceable.
-- If a team-state item becomes a thing the user needs to do, create a corresponding `tasks-active` Watch entry with a note back to team-state for context. Don't duplicate — link.
-- If uncertain which section an item belongs in, default to `tasks-active` Watch (it has the forcing function to clean itself up later).
-- If the user has a wiki without `team-state` or `opportunities` (some setups won't), fall back to `tasks-active` for everything and the user can split later.
-
-**Codebase wiki:**
-- Update domain pages with new technical requirements or decisions
-- Create new feature/decision pages if significant architecture discussions found
-
-### 4. Report
-
-Give Matt a brief summary: how many new tasks found, any urgent items, anything surprising. Keep it short — 3-5 lines max.
-
-## Optimisation Notes
-
-- Screenshots are the reliable way to read Teams messages — the accessibility tree and JS extraction don't work well with Teams' SPA
-- Scroll 5 ticks at a time, screenshot each position
-- Check message timestamps — stop scrolling when you reach messages older than the last scan
-- If a chat has no unread indicator and was checked recently, skip it
-- The `comms-sources` learning notes compound over time — read them carefully before each run to avoid repeating mistakes
-
-## Running on a Loop
-
-**Important: do not invoke this skill directly from a loop in the main conversation.** The Teams/Slack screenshots fill the main context with image data every tick.
-
-Instead, schedule a cron (via `CronCreate`) whose prompt dispatches a **general-purpose subagent** via the `Agent` tool. The subagent invokes `/check-comms` via the `Skill` tool, performs the scan inside its own isolated context, updates the wikis, and returns only a brief text summary (3-5 lines max) to the main conversation. No screenshots cross the boundary.
-
-Example cron prompt:
-> "Dispatch a general-purpose subagent via the Agent tool to run the /check-comms skill. Subagent returns only a brief text summary of new items — no screenshots, no verbose logs."
-
-When running this way, be extra concise in the report. Only surface genuinely new items.
+When you discover something useful about how to scan a particular service — a better navigation path, a sidebar quirk, a priority insight the user hasn't captured — append it as a note to that service's entry in `comms-sources` via `/wiki-update`. Future runs read those notes and benefit. This is how the skill adapts to real workspaces over time without requiring plugin updates.
