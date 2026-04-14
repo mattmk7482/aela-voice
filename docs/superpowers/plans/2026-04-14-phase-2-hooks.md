@@ -4,7 +4,7 @@
 
 **Goal:** Port the two session-start hooks from matt-head to the aela-voice plugin: `session-orient.js` (wiki orientation + context injection) and `wiki-maintenance.js` (source discovery + health check). Both register alongside the existing `session-start.js` and coexist without conflict.
 
-**Architecture:** Two new hook scripts under `plugin/hooks/` that import from the wiki server's `store.js` for path resolution and wiki operations. Helper functions needed by the hooks (`readSources`, `checkWikiHealth`) are added to `store.js` as exports so the yaml dependency stays in one place — the wiki server's node_modules — and the hooks never need their own dep. Hook output splits by purpose: `session-orient.js` emits JSON with `hookSpecificOutput.additionalContext` (same shape as the existing session-start hook), while `wiki-maintenance.js` emits plain markdown to stdout as a maintenance report (matching matt-head's reference behaviour).
+**Architecture:** Two new hook scripts under `plugin/hooks/` that import from the wiki server's `store.js` for path resolution and wiki operations. Helper functions needed by the hooks (`readSources`, `checkWikiHealth`) are added to `store.js` as exports so the yaml-using logic stays in the wiki server's module boundary. The hooks directory gets its own small `package.json` with a `yaml` dep for the one case where a hook needs yaml directly (session-orient parsing `personality.yaml`). Each hook that needs its own deps runs an npm-install bootstrap guard at the top — the same pattern the existing TTS `start.js` uses. Hook output splits by purpose: `session-orient.js` emits JSON with `hookSpecificOutput.additionalContext` (same shape as the existing session-start hook), while `wiki-maintenance.js` emits plain markdown to stdout as a maintenance report (matching matt-head's reference behaviour).
 
 **Tech Stack:** Node 20+ ESM, existing `yaml@^2.8.3` dep in the wiki server, no new dependencies, no build step.
 
@@ -37,6 +37,7 @@
 ```
 plugin/
 ├── hooks/
+│   ├── package.json            # NEW — yaml dep for hooks
 │   ├── hooks.json              # Modified: add two new SessionStart entries
 │   ├── session-start.js        # Untouched (existing TTS/personality hook)
 │   ├── turn-end.js             # Untouched
@@ -262,7 +263,55 @@ EOF
 
 ---
 
-## Task 2: Create `session-orient.js` hook
+## Task 2: Scaffold `plugin/hooks/package.json` and install yaml dep
+
+The hooks directory gets its own tiny package.json so `session-orient.js` can do `import YAML from 'yaml'` cleanly. Same pattern as the TTS MCP server: each dir that needs deps has its own package.json, and the entry scripts run an npm-install bootstrap guard at first invocation.
+
+**Files:**
+- Create: `plugin/hooks/package.json`
+
+- [ ] **Step 1: Create the package.json**
+
+Create `plugin/hooks/package.json`:
+
+```json
+{
+  "name": "aela-voice-hooks",
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "yaml": "^2.8.3"
+  }
+}
+```
+
+- [ ] **Step 2: Install dependencies**
+
+```
+cd /c/devworkspace/aela-voice/plugin/hooks && npm install
+```
+
+Verify afterwards that `node_modules/yaml/package.json` exists. Commit both the package.json and the lockfile.
+
+- [ ] **Step 3: Commit**
+
+```
+cd /c/devworkspace/aela-voice/plugin && git add hooks/package.json hooks/package-lock.json && git commit -m "$(cat <<'EOF'
+feat(hooks): scaffold hooks package with yaml dep
+
+The hooks directory gets its own tiny package.json so session-orient
+can import yaml directly for parsing personality.yaml. Matches the
+TTS server pattern: each directory that needs deps has its own
+package.json and an npm-install bootstrap guard at first invocation.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+---
+
+## Task 3: Create `session-orient.js` hook
 
 Write the session-orient hook that emits `additionalContext` with wiki indexes, orientation pages, and optional PLUGIN-FEATURES / user name injection.
 
@@ -411,15 +460,35 @@ Create `plugin/hooks/session-orient.js`:
  */
 
 import { readFileSync, existsSync } from 'fs';
+import { execSync } from 'child_process';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { fileURLToPath } from 'url';
-import YAML from '../mcp-servers/wiki/node_modules/yaml/dist/index.js';
-
-import { wikiUpdateIndex, wikiDir, wikiRead, wikiList } from '../mcp-servers/wiki/store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = join(__dirname, '..');
+
+// ── Bootstrap: ensure hooks' node_modules exists ────────────────────────────
+// Matches the TTS server's start.js pattern. On a fresh install, node_modules
+// is absent until the first invocation runs npm install. Best effort — if npm
+// fails, the subsequent yaml import will throw a clear error.
+
+if (!existsSync(join(__dirname, 'node_modules'))) {
+  try {
+    execSync('npm install --omit=dev', {
+      cwd: __dirname,
+      stdio: 'ignore',
+      timeout: 25000,
+    });
+  } catch { /* best effort */ }
+}
+
+// Now that deps are guaranteed installed, dynamically import yaml and the
+// wiki store. These can't be static imports at the top because the bootstrap
+// above might need to run before yaml is available on disk.
+
+const { default: YAML } = await import('yaml');
+const { wikiUpdateIndex, wikiDir, wikiRead, wikiList } = await import('../mcp-servers/wiki/store.js');
 
 const ORIENTATION_PAGES = [
   'tasks-active',
@@ -507,7 +576,11 @@ console.log(JSON.stringify({
 }));
 ```
 
-**Note on the yaml import:** the direct path `../mcp-servers/wiki/node_modules/yaml/dist/index.js` is ugly but necessary because `plugin/hooks/` has no `package.json` and no `node_modules` of its own. This reaches into the wiki server's node_modules to reuse its yaml dep. If this path proves fragile (e.g., yaml's dist layout changes on update), swap it for a re-export from `store.js`: add `export { default as YAML } from 'yaml';` in store.js and import `YAML` from there. For now, the direct path keeps store.js unchanged.
+**Notes on the imports:**
+
+- The top-level static imports are only things that ship with Node (`fs`, `child_process`, `path`, `os`, `url`). This is safe even when `node_modules/` is missing on first invocation.
+- `yaml` and the wiki store are loaded via dynamic `import()` after the bootstrap guard runs — by that point `node_modules/` is guaranteed to exist.
+- The wiki store import (`../mcp-servers/wiki/store.js`) works without any guard on the hook's node_modules because store.js's own `yaml` import resolves from `mcp-servers/wiki/node_modules/` (where it's already installed from Phase 1), not from the hooks directory.
 
 - [ ] **Step 4: Run to confirm it passes**
 
@@ -542,7 +615,7 @@ EOF
 
 ---
 
-## Task 3: Create `wiki-maintenance.js` hook
+## Task 4: Create `wiki-maintenance.js` hook
 
 Port the workspace-scanning maintenance hook. Text output to stdout, not JSON.
 
@@ -880,7 +953,7 @@ EOF
 
 ---
 
-## Task 4: Register both hooks in `hooks.json`
+## Task 5: Register both hooks in `hooks.json`
 
 **Files:**
 - Modify: `plugin/hooks/hooks.json`
@@ -961,7 +1034,7 @@ EOF
 
 ---
 
-## Task 5: Claude Code integration gate
+## Task 6: Claude Code integration gate
 
 This task does not write code — it verifies that both new hooks fire at session start and behave correctly in a live Claude Code session.
 
@@ -1015,7 +1088,10 @@ Phase 2 scope from the spec:
 
 **4. Graceful absence handling.** Every file the hooks depend on can be absent at Phase 2 time (no personality.yaml, no PLUGIN-FEATURES.md, empty wikis, no sources.md). The verify scripts explicitly test the cold-start case alongside the warm case. If any hook fails on absent files, the session-start chain breaks and the plugin is unusable.
 
-**5. One thing worth flagging for the implementer.** The `readUserName` function in `session-orient.js` uses `process.env.AELA_PLUGIN_HOME || homedir()` so tests can isolate the personality.yaml path. This matches the wiki store's env override pattern. Do not use a different env var name — consistency matters.
+**5. Two things worth flagging for the implementer.**
+
+- The `readUserName` function in `session-orient.js` uses `process.env.AELA_PLUGIN_HOME || homedir()` so tests can isolate the personality.yaml path. This matches the wiki store's env override pattern. Do not use a different env var name — consistency matters.
+- The bootstrap guard in `session-orient.js` uses `stdio: 'ignore'` so npm install output doesn't pollute the JSON stdout the hook emits. Do not change this — the hook's stdout must be a single valid JSON line.
 
 ---
 
