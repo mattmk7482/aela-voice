@@ -121,9 +121,7 @@ export function wikiCreate(wiki, page, { title, category, description, body, log
   const entry = logEntry || `create | ${page}`;
   appendLog(wiki, entry);
 
-  if (typeof wikiUpdateIndex === 'function') {
-    wikiUpdateIndex(wiki);
-  }
+  wikiUpdateIndex(wiki);
 
   return `Created page "${page}" in ${wiki} wiki.`;
 }
@@ -136,12 +134,62 @@ export function wikiDelete(wiki, page) {
     unlinkSync(p);
   }
 
-  if (typeof wikiUpdateIndex === 'function') {
-    wikiUpdateIndex(wiki);
-  }
+  wikiUpdateIndex(wiki);
   appendLog(wiki, `delete | ${page}`);
 
   return `Deleted page "${page}" from ${wiki} wiki.`;
+}
+
+export function wikiUpdateIndex(wiki) {
+  validateWiki(wiki);
+  const dir = pagesDir(wiki);
+  if (!existsSync(dir)) return 'No pages in wiki.';
+
+  const files = readdirSync(dir).filter(f => f.endsWith('.md'));
+  if (files.length === 0) return 'No pages in wiki.';
+
+  const pages = [];
+  for (const f of files) {
+    const raw = readFileSync(join(dir, f), 'utf-8');
+    const name = f.replace(/\.md$/, '');
+    const match = raw.match(/^---\n([\s\S]*?)\n---/);
+    const fm = match ? (YAML.parse(match[1]) || {}) : {};
+    pages.push({
+      name,
+      title: fm.title || name,
+      category: (fm.category || 'uncategorised').toLowerCase(),
+      description: fm.description || fm.title || name,
+    });
+  }
+
+  const groups = {};
+  for (const p of pages) {
+    if (!groups[p.category]) groups[p.category] = [];
+    groups[p.category].push(p);
+  }
+
+  const wikiLabel = wiki.charAt(0).toUpperCase() + wiki.slice(1);
+  const lines = [`# ${wikiLabel} Wiki — Index\n`];
+
+  const cats = Object.keys(groups).sort((a, b) => {
+    if (a === 'uncategorised') return 1;
+    if (b === 'uncategorised') return -1;
+    return a.localeCompare(b);
+  });
+
+  for (const cat of cats) {
+    const label = cat.charAt(0).toUpperCase() + cat.slice(1);
+    lines.push(`## ${label}\n`);
+    for (const p of groups[cat].sort((a, b) => a.name.localeCompare(b.name))) {
+      lines.push(`- [[${p.name}]] — ${p.description}`);
+    }
+    lines.push('');
+  }
+
+  const content = lines.join('\n');
+  const indexPath = join(wikiDir(wiki), 'index.md');
+  writeFileSync(indexPath, content, 'utf-8');
+  return `Updated ${wiki} wiki index (${pages.length} pages, ${cats.length} categories).`;
 }
 
 // ── Log ─────────────────────────────────────────────────────────────────────

@@ -26,20 +26,25 @@ wikiCreate('project', 'alpha', {
 const log = wikiLog('project');
 check('log contains create entry', /create \| alpha/.test(log));
 
-const afterCreate = wikiList('project');
-check(
-  'wikiList returns placeholder when index.md absent',
-  /empty/.test(afterCreate)
-);
+const { wikiUpdateIndex } = await import('../store.js');
 
-mkdirSync(join(tmp, '.aela', 'wiki', 'project'), { recursive: true });
-writeFileSync(
-  join(tmp, '.aela', 'wiki', 'project', 'index.md'),
-  '# Manual Index\n',
-  'utf-8'
-);
+wikiCreate('project', 'beta', {
+  title: 'Beta Page', category: 'reference', description: 'Beta desc', body: 'B',
+});
+wikiCreate('project', 'gamma', {
+  title: 'Gamma Page', category: 'context', description: 'Gamma desc with colons: multiple: parts', body: 'G',
+});
+
+const result = wikiUpdateIndex('project');
+check('wikiUpdateIndex returns status message', /Updated/.test(result));
+
 const idx = wikiList('project');
-check('wikiList returns index.md content', /Manual Index/.test(idx));
+check('index has Project heading', /Project Wiki — Index/.test(idx));
+check('index lists alpha with description', /\[\[alpha\]\] — Alpha desc/.test(idx));
+check('index lists beta', /\[\[beta\]\] — Beta desc/.test(idx));
+check('index lists gamma with colons in description', /Gamma desc with colons: multiple: parts/.test(idx));
+check('reference category heading present', /## Reference/.test(idx));
+check('context category heading present', /## Context/.test(idx));
 
 rmSync(tmp, { recursive: true, force: true });
 process.exit(failed > 0 ? 1 : 0);
