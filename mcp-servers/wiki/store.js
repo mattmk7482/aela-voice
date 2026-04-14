@@ -63,6 +63,27 @@ export function wikiRead(wiki, page, externalPath) {
   return readFileSync(p, 'utf-8');
 }
 
+export function wikiList(wiki) {
+  validateWiki(wiki);
+  const indexPath = join(wikiDir(wiki), 'index.md');
+  if (!existsSync(indexPath)) return '_(empty wiki)_';
+  return readFileSync(indexPath, 'utf-8');
+}
+
+export function wikiLog(wiki, limit = 20) {
+  validateWiki(wiki);
+  const logPath = join(wikiDir(wiki), 'log.md');
+  if (!existsSync(logPath)) return '_(no log)_';
+
+  const content = readFileSync(logPath, 'utf-8');
+  const entries = content.split(/^## /m).filter(e => e.trim());
+  const header = entries.length > 0 && !entries[0].startsWith('[') ? entries.shift() : '';
+  const recent = entries.slice(-limit);
+
+  if (recent.length === 0) return '_(no log entries)_';
+  return recent.map(e => `## ${e.trim()}`).join('\n\n');
+}
+
 // ── Write operations ────────────────────────────────────────────────────────
 
 export function wikiCreate(wiki, page, { title, category, description, body, logEntry, tags } = {}) {
@@ -105,6 +126,22 @@ export function wikiCreate(wiki, page, { title, category, description, body, log
   }
 
   return `Created page "${page}" in ${wiki} wiki.`;
+}
+
+export function wikiDelete(wiki, page) {
+  validateWiki(wiki);
+  const p = pagePath(wiki, page);
+
+  if (existsSync(p)) {
+    unlinkSync(p);
+  }
+
+  if (typeof wikiUpdateIndex === 'function') {
+    wikiUpdateIndex(wiki);
+  }
+  appendLog(wiki, `delete | ${page}`);
+
+  return `Deleted page "${page}" from ${wiki} wiki.`;
 }
 
 // ── Log ─────────────────────────────────────────────────────────────────────
