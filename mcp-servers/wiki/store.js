@@ -29,7 +29,8 @@ function validateWiki(wiki) {
 export function wikiDir(wiki) {
   validateWiki(wiki);
   if (wiki === 'personal') {
-    return join(homedir(), '.claude', 'aela-plugin', 'wiki');
+    const base = process.env.AELA_PLUGIN_HOME || homedir();
+    return join(base, '.claude', 'aela-plugin', 'wiki');
   }
   // project
   return join(process.cwd(), '.aela', 'wiki', 'project');
@@ -190,6 +191,74 @@ export function wikiUpdateIndex(wiki) {
   const indexPath = join(wikiDir(wiki), 'index.md');
   writeFileSync(indexPath, content, 'utf-8');
   return `Updated ${wiki} wiki index (${pages.length} pages, ${cats.length} categories).`;
+}
+
+export function wikiSearch(query) {
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return 'Empty query.';
+
+  const allResults = [];
+
+  for (const wiki of VALID_WIKIS) {
+    const dir = pagesDir(wiki);
+    if (!existsSync(dir)) continue;
+
+    const files = readdirSync(dir).filter(f => f.endsWith('.md'));
+    if (files.length === 0) continue;
+
+    for (const file of files) {
+      const raw = readFileSync(join(dir, file), 'utf-8');
+      const name = file.replace(/\.md$/, '');
+
+      const match = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+      const fm = match ? (YAML.parse(match[1]) || {}) : {};
+      const body = match ? match[2] : raw;
+
+      const titleText = (fm.title || name).toLowerCase();
+      const descriptionText = (fm.description || '').toLowerCase();
+      const bodyLower = body.toLowerCase();
+
+      let score = 0;
+      for (const term of terms) {
+        if (titleText.includes(term)) score += 15;
+        if (descriptionText.includes(term)) score += 8;
+        const bodyMatches = (bodyLower.match(new RegExp(escapeRegex(term), 'g')) || []).length;
+        score += Math.min(bodyMatches, 5);
+      }
+
+      if (score > 0) {
+        const firstTerm = terms.find(t => bodyLower.includes(t) || titleText.includes(t) || descriptionText.includes(t));
+        let snippet = '';
+        if (firstTerm) {
+          const haystack = bodyLower.includes(firstTerm) ? body : (fm.description || fm.title || name);
+          const lowerHaystack = haystack.toLowerCase();
+          const idx = lowerHaystack.indexOf(firstTerm);
+          if (idx >= 0) {
+            const start = Math.max(0, idx - 80);
+            const end = Math.min(haystack.length, idx + 120);
+            snippet = (start > 0 ? '...' : '') + haystack.slice(start, end).trim() + (end < haystack.length ? '...' : '');
+          } else {
+            snippet = (fm.description || '').slice(0, 200);
+          }
+        }
+
+        allResults.push({ wiki, page: name, score, snippet });
+      }
+    }
+  }
+
+  allResults.sort((a, b) => b.score - a.score);
+  const top = allResults.slice(0, 10);
+
+  if (top.length === 0) return `No results for "${query}".`;
+
+  return top
+    .map(r => `### ${r.wiki}:${r.page} (score: ${r.score})\n${r.snippet}`)
+    .join('\n\n---\n\n');
+}
+
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // ── Log ─────────────────────────────────────────────────────────────────────
