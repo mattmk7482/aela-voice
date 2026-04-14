@@ -91,7 +91,7 @@ Everything editable lives outside the plugin cache so reinstall never destroys u
             └── <project pages>.md
 
 ~/.claude/plugins/cache/...         # plugin code (wiped on reinstall)
-├── personalities/
+├── personality/
 │   └── default.yaml                # shipped template
 ├── PLUGIN-FEATURES.md               # shipped contract doc
 ├── mcp-servers/
@@ -107,7 +107,7 @@ Everything editable lives outside the plugin cache so reinstall never destroys u
 
 **Personal wiki is plugin-named, not companion-named.** Users who rename their companion in `/aela-init` do not move files. Multi-user systems do not collide if two users name their companions the same thing.
 
-**Personality template vs user copy.** Plugin ships `personalities/default.yaml` as a template. On first run `/aela-init` copies it to `~/.claude/aela-plugin/personality.yaml`. All edits (via `update_personality` MCP tool or hand edits) write to the user copy. The TTS server reads the user copy if present, falls back to the template otherwise. Reinstall rewrites the template but does not touch the user copy.
+**Personality template vs user copy.** Plugin ships `personality/default.yaml` as a template. On first run `/aela-init` copies it to `~/.claude/aela-plugin/personality.yaml`. All edits (via `update_personality` MCP tool or hand edits) write to the user copy. The TTS server reads the user copy if present, falls back to the template otherwise. Reinstall rewrites the template but does not touch the user copy.
 
 **Template refresh on plugin upgrade.** When the plugin ships a new template, `/aela-init` can be re-run to offer a refresh. It cannot tell what's user-customisation vs an older template, so it presents the current user file and the new template side by side and lets the user pick what to merge. v2.0.0 ships user-driven refresh only. Automatic merging is deferred.
 
@@ -158,7 +158,7 @@ Seven skills under `plugin/skills/`.
 
 ## Personality Addition
 
-The plugin ships `personalities/default.yaml` as a template. `/aela-init` copies it to `~/.claude/aela-plugin/personality.yaml` on first run.
+The plugin ships `personality/default.yaml` as a template. `/aela-init` copies it to `~/.claude/aela-plugin/personality.yaml` on first run.
 
 Add a `how_i_remember` section to the default template:
 
@@ -335,7 +335,7 @@ Wire both into plugin hooks config.
 
 Delete the plugin's minimal `/turn-end` (the rich version replaces it).
 
-**Phase 4 — Personality and PLUGIN-FEATURES.md.** Add the `how_i_remember` section to `plugin/personalities/default.yaml`. Write `plugin/PLUGIN-FEATURES.md` from scratch — Karpathy-grounded wiki guidance, full tool surface, contract pages, baseline worth-persisting criteria, reflections tight filter, user-name imperative, when to reach for `wiki_search`. Under 100 lines. Wire session-orient to inject it.
+**Phase 4 — Personality and PLUGIN-FEATURES.md.** Add the `how_i_remember` section to `plugin/personality/default.yaml`. Write `plugin/PLUGIN-FEATURES.md` from scratch — Karpathy-grounded wiki guidance, full tool surface, contract pages, baseline worth-persisting criteria, reflections tight filter, user-name imperative, when to reach for `wiki_search`. Under 100 lines. Wire session-orient to inject it.
 
 **Phase 5 — README rewrite.** Full rewrite of `plugin/README.md`. Sections: pitch, quick-start, features, installation, configuration, skills reference, MCP servers reference, architecture overview, personality customisation, subagent CLAUDE.md gotcha, troubleshooting, contributing. Replaces the current TTS-only README. First-class user-facing document.
 
@@ -344,7 +344,7 @@ Delete the plugin's minimal `/turn-end` (the rich version replaces it).
 - Split `matt-head/wiki/aela/` → `~/.claude/aela-plugin/wiki/` (restructure to match new layout)
 - Split `matt-head/wiki/codebase/` → `matt-head/.aela/wiki/project/`
 - Delete `matt-head/wiki/`
-- Copy `plugin/personalities/default.yaml` → `~/.claude/aela-plugin/personality.yaml` with Matt's existing customisations preserved
+- Copy `plugin/personality/default.yaml` → `~/.claude/aela-plugin/personality.yaml` with Matt's existing customisations preserved
 - Migrate matt-head `sources.md` to YAML format at the new location
 - Rename `matt-head/docs/analysis/` → `matt-head/docs/wiki-ingest/`
 - Delete matt-head's duplicate wiki store and MCP code (`src/wiki/`, relevant parts of `src/mcp-tools.js`, `src/mcp-server.js`) — plugin owns these now
