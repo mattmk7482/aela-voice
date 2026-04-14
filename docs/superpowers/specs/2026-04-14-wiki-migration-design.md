@@ -68,8 +68,7 @@ Everything editable lives outside the plugin cache so reinstall never destroys u
 ~/.claude/aela-plugin/              # user state dir (survives reinstall)
 ├── wiki/                           # personal wiki
 │   ├── index.md
-│   ├── raw/
-│   │   └── log.md                  # no sources.md — personal wiki has no file sources
+│   ├── log.md                      # activity log at wiki root
 │   └── pages/
 │       ├── tasks-active.md
 │       ├── team-state.md
@@ -85,8 +84,8 @@ Everything editable lives outside the plugin cache so reinstall never destroys u
 └── wiki/
     └── project/
         ├── index.md
+        ├── log.md                  # activity log at wiki root
         ├── raw/
-        │   ├── log.md
         │   └── sources.md          # yaml format, tracks ingested sources
         └── pages/
             └── <project pages>.md

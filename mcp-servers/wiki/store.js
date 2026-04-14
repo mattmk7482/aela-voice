@@ -52,14 +52,14 @@ export function wikiRead(wiki, page, externalPath) {
     const name = page.endsWith('.md') ? page : `${page}.md`;
     const p = join(externalPath, name);
     if (!existsSync(p)) {
-      return `Page "${page}" not found at external path "${externalPath}".`;
+      throw new Error(`Page "${page}" not found at external path "${externalPath}".`);
     }
     return readFileSync(p, 'utf-8');
   }
 
   const p = pagePath(wiki, page);
   if (!existsSync(p)) {
-    return `Page "${page}" not found in ${wiki} wiki.`;
+    throw new Error(`Page "${page}" not found in ${wiki} wiki.`);
   }
   return readFileSync(p, 'utf-8');
 }

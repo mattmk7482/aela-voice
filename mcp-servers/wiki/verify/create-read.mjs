@@ -43,8 +43,12 @@ try {
   check('missing-field create throws', /missing required fields/.test(e.message), e.message);
 }
 
-const missing = wikiRead('project', 'nope');
-check('read missing page returns not-found string', /not found/.test(missing));
+try {
+  wikiRead('project', 'nope');
+  check('read missing page throws', false, 'did not throw');
+} catch (e) {
+  check('read missing page throws', /not found/.test(e.message), e.message);
+}
 
 const extDir = join(tmp, 'external-wiki');
 mkdirSync(extDir, { recursive: true });
@@ -52,8 +56,18 @@ writeFileSync(join(extDir, 'ext-page.md'), '# External Content\n', 'utf-8');
 const ext = wikiRead('external', 'ext-page', extDir);
 check('external wikiRead returns external content', /External Content/.test(ext));
 
-const extMissing = wikiRead('external', 'nope', extDir);
-check('external wikiRead missing page returns not-found', /not found at external path/.test(extMissing));
+try {
+  wikiRead('external', 'nope', extDir);
+  check('external wikiRead missing page throws', false, 'did not throw');
+} catch (e) {
+  check('external wikiRead missing page throws', /not found at external path/.test(e.message), e.message);
+}
 
-rmSync(tmp, { recursive: true, force: true });
+// Cleanup — chdir out of tmp first so Windows can release the dir
+process.chdir(tmpdir());
+try {
+  rmSync(tmp, { recursive: true, force: true });
+} catch (e) {
+  // Windows may still hold handles briefly; non-fatal for verification
+}
 process.exit(failed > 0 ? 1 : 0);
