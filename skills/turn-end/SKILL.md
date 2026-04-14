@@ -20,7 +20,7 @@ Four questions, in order. Answer each one honestly before moving on.
 - **People / team-state** — someone's focus shifted, a new person entered the orbit, a thread moved forward.
 - **Cross-references** — if one fact affects multiple pages, update them all. One fact, many homes.
 
-**User-specific extensions** come from the `reflections` page (if it exists — see contract pages in PLUGIN-FEATURES.md). Read the current `reflections` content at session start along with the baseline criteria above, and treat its bullets as additional things to watch for. The user's `reflections` is where role-specific watch items live — a developer user might track implementation gotchas, an exec user might track pipeline shifts and HR follow-ups.
+**User-specific extensions** come from the `reflections` page (if it exists). Read the current `reflections` content at session start along with the baseline criteria above, and treat its bullets as additional things to watch for. The user's `reflections` is where role-specific watch items live — the things the user cares about given their day-to-day work, beyond the role-neutral baseline above.
 
 **Not worth persisting:**
 
@@ -86,6 +86,8 @@ Rules of the voice:
 Speak is async TTS — it plays over the next several seconds, masking any visual output from step 3 below.
 
 ## 3. Comms cron self-heal
+
+**Guard:** if `wiki_read(wiki: "personal", page: "comms-sources")` throws (the page doesn't exist), skip this entire step silently. Comms scanning hasn't been set up yet — `/comms-init` will create `comms-sources` when the user runs it, and the next turn-end after that will schedule the cron. Until then, there's no point scheduling a cron that would just bounce off a missing page on every tick.
 
 Look at your recent conversation context and answer: **"Has the literal string `check-comms Started` appeared earlier in this session?"**
 
