@@ -134,16 +134,28 @@ _(user-specific categories to check at turn-end Question 1, beyond the role-neut
 _(This page is populated by /comms-init. Run /comms-init to configure which communication services to scan and how.)_
 ```
 
-## Create the directories and pages
+## Create the project wiki
 
-After scaffolding the contract pages above, also call `wiki_update_index` on both wikis:
+The project wiki lives at `<project-root>/.aela/wiki/project/`. Unlike the personal wiki, it has no contract pages at install time — it gets populated by `/wiki-ingest` and by learnings captured while working in the project. But it still needs to exist on disk so `session-orient.js` and `wiki-maintenance.js` can read its index and sources tracking file without erroring.
 
-```
-wiki_update_index(wiki: "personal")
-wiki_update_index(wiki: "project")
-```
+Two steps, both required:
 
-The project wiki has no contract pages yet — `wiki_update_index("project")` regenerates an empty-ish index that session-orient can read without erroring.
+1. **Seed `sources.md`.** Run the seed-sources CLI, which discovers every source document in the workspace and writes `<project-root>/.aela/wiki/project/raw/sources.md` with each entry as `ingested: false`. This also materialises the project wiki directory as a side effect. Invoke it via Bash:
+
+   ```
+   node ${CLAUDE_PLUGIN_ROOT}/mcp-servers/wiki/seed-sources.js
+   ```
+
+   The CLI is idempotent — if `sources.md` already exists and is valid YAML, it leaves it untouched. Capture the stdout so you can report the source count to the user. The output line on a fresh seed looks like `Seeded N source(s) to <path>` — extract N via a simple regex (`/Seeded (\d+) source/`), do NOT try to `JSON.parse` it (it's plain text).
+
+2. **Regenerate both wiki indexes.** After the contract pages are scaffolded above and the project wiki dir exists, call both:
+
+   ```
+   wiki_update_index(wiki: "personal")
+   wiki_update_index(wiki: "project")
+   ```
+
+   Both are required. `wiki_update_index("project")` may regenerate an empty-ish index initially — that's correct. It gives `session-orient.js` something to read.
 
 ## Create docs/wiki-ingest/
 
@@ -155,17 +167,12 @@ mkdir -p <project-root>/docs/wiki-ingest
 
 Leave it empty — users populate it with analysis docs they want the companion to ingest.
 
-## Scan for pre-existing sources
+## Report pre-existing sources
 
-Run the maintenance hook discovery once to see if the user already has superpowers specs/plans or analysis docs in the workspace. The hook's script is at `${CLAUDE_PLUGIN_ROOT}/hooks/wiki-maintenance.js`. Run it via Bash and capture the output:
+The seed-sources CLI output from earlier tells you how many sources were discovered. Relay it to the user:
 
-```
-node ${CLAUDE_PLUGIN_ROOT}/hooks/wiki-maintenance.js
-```
-
-If it reports flagged sources, tell the user: "I found <N> source documents in your workspace that could be ingested into the wiki. Run `/wiki-ingest` when you're ready to bring them in, or `/wiki-ingest <path>` to target one specifically."
-
-If it reports nothing, say so and move on.
+- If it reported one or more sources: "I found <N> source documents in your workspace that could be ingested into the wiki. Run `/wiki-ingest` when you're ready to bring them in, or `/wiki-ingest <path>` to target one specifically."
+- If it reported zero: say nothing about sources and move on.
 
 ## Offer the chain
 
