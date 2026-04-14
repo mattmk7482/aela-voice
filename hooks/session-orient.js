@@ -128,7 +128,7 @@ if (pageSections) {
   sections.push('## Orientation pages (loaded in full)\n\n' + pageSections);
 }
 
-const additionalContext = '# Wiki orientation\n\n' + sections.join('\n\n---\n\n') + '\n';
+const additionalContext = '# Orientation\n\n' + sections.join('\n\n---\n\n') + '\n';
 
 console.log(JSON.stringify({
   hookSpecificOutput: {

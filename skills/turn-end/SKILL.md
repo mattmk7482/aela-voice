@@ -11,6 +11,8 @@ Three actions in order: **reflect → speak → comms heal**. The ordering matte
 
 Four questions, in order. Answer each one honestly before moving on.
 
+**About the contract pages referenced below:** `tasks-active`, `team-state`, `working-preferences`, `user-profile`, and `reflections` are all already loaded in your session-start context under the `# Orientation` section, injected there by the `session-orient.js` hook. You do not need to `wiki_read` them — reference the content you already have. The same applies to both wiki indexes. Only call `wiki_read` if you need a page that isn't in the orientation set (e.g. `people`, `development-environment`, something discovered via `wiki_search`).
+
 ### Question 1 — Is anything from this turn worth persisting to wiki?
 
 **Baseline worth-persisting criteria** (apply to every user):
@@ -20,7 +22,7 @@ Four questions, in order. Answer each one honestly before moving on.
 - **People / team-state** — someone's focus shifted, a new person entered the orbit, a thread moved forward.
 - **Cross-references** — if one fact affects multiple pages, update them all. One fact, many homes.
 
-**User-specific extensions** come from the `reflections` page (if it exists). Read the current `reflections` content at session start along with the baseline criteria above, and treat its bullets as additional things to watch for. The user's `reflections` is where role-specific watch items live — the things the user cares about given their day-to-day work, beyond the role-neutral baseline above.
+**User-specific extensions** come from the `reflections` page (if it exists). Its contents are already in your Orientation section — scan the bullets there and treat them as additional things to watch for, beyond the role-neutral baseline above. The user's `reflections` is where role-specific watch items live — the things the user cares about given their day-to-day work.
 
 **Not worth persisting:**
 
