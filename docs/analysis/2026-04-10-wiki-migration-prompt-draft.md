@@ -15,7 +15,7 @@ related:
 
 The wiki feature currently lives in the `matt-head` project:
 - Wiki content at `C:/devworkspace/matt-head/wiki/` (two wikis: `aela/` personal, `codebase/` work)
-- MCP server at `C:/devworkspace/matt-head/src/mcp-server.js` exposing `wiki_read`, `wiki_write`, `wiki_search`, `wiki_list`, `wiki_update_index`, `wiki_log`, `get_briefing`, `log_task`, etc.
+- MCP server at `C:/devworkspace/matt-head/src/mcp-server.js` exposing `wiki_search`, `wiki_read`, `wiki_create`, `wiki_delete`, `wiki_list`, `wiki_update_index`, `wiki_log`. Updates to existing pages happen via the `wiki-update` skill (Edit-based, preserves frontmatter), not a dedicated MCP tool. `wiki_read` also supports an `external` mode (`wiki: 'external'` + `path`) for reading collaborator wikis by filesystem path.
 - Wiki-first discipline enforced via `CLAUDE.md` in the matt-head project directory
 - Session-start hook at `scripts/wiki-maintenance.js` flags un-ingested sources
 
@@ -91,7 +91,7 @@ Split what currently ships as one MCP server into **three** small, composable se
 | Server | Tools | Purpose |
 |---|---|---|
 | `mcp-servers/voice/` | `speak`, `list_voices`, `set_voice`, `get_tts_settings`, `set_tts_settings`, `get_personality`, `update_personality`, `mute`, `unmute`, `upload_voice_sample` | Current TTS server (already exists) |
-| `mcp-servers/wiki/` | `wiki_read`, `wiki_write`, `wiki_search`, `wiki_list`, `wiki_update_index`, `wiki_log` | Extracted from matt-head's `src/mcp-server.js` |
+| `mcp-servers/wiki/` | `wiki_search`, `wiki_read`, `wiki_create`, `wiki_delete`, `wiki_list`, `wiki_update_index`, `wiki_log` | Extracted from matt-head's `src/mcp-server.js`. Note: there is no `wiki_update` MCP tool — existing-page edits go through the `wiki-update` skill, which uses the Edit tool directly so the model touches only the bytes it intends to change and frontmatter is preserved. Ship the skill alongside the server. |
 | `mcp-servers/comms/` | (TBD — likely wraps the generalised check-comms skill's state tracking) | Companion to the comms skill |
 
 Each is independently loadable. This makes the plugin look less like a monolith and more like a composable companion framework — a user who doesn't want voice could still benefit from the wiki layer.
@@ -147,11 +147,43 @@ matt-head validated a three-hook pattern on 2026-04-13 (see `wiki-discipline-hoo
 
 - **`hooks/session-orient.js` (SessionStart)** — reads both wiki indexes + the three always-loaded orientation pages (`tasks-active`, `team-state`, `working-preferences`) from disk and emits them as `additionalContext` in Claude Code's JSON hook output. Also injects the comms-cron prompt for rescheduling (Claude Code crons die on session exit). Parameterised by `AELA_WIKI_ROOT` / `CODEBASE_WIKI_ROOT` env vars so the same script works for both the matt-head paths and the plugin defaults (`~/.claude/aela-wiki/` + `<cwd>/.aela-wiki/`). This is what makes the "index is my navigation layer" promise in `How I Remember` actually land — the model has both indexes in context before it touches a tool.
 
-- **`hooks/wiki-maintenance.js` (SessionStart)** — flags un-ingested sources (superpowers specs/plans, analysis docs) across all configured project paths. Composes with `session-orient.js`; multiple SessionStart hook entries all run.
+  **Reindex on startup (2026-04-14 update):** the matt-head version now calls `wikiUpdateIndex('aela')` and `wikiUpdateIndex('codebase')` in non-fatal try/catch blocks **before** reading the indexes for injection. This guards against pages that arrived via `git pull` without going through `wiki_create` — their frontmatter exists on disk but hasn't been folded into `index.md` yet. The plugin port must do the same two calls; once the plugin's wiki module is extracted, `wikiUpdateIndex` is directly importable.
+
+- **`hooks/wiki-maintenance.js` (SessionStart)** — flags un-ingested sources and detects sibling-repo `.aela/wiki/` dirs for portal-page ingest. Composes with `session-orient.js`; multiple SessionStart hook entries all run.
+
+  **Rewritten, not ported (2026-04-13 update):** the matt-head version no longer hardcodes project paths. New behaviour the plugin must preserve:
+  - Globs `**/docs/analysis/**/*.md`, `**/docs/superpowers/specs/**/*.md`, `**/docs/superpowers/plans/**/*.md` from a `WORKSPACE_ROOT` env var (defaults to one level above the project root, or `process.cwd()` at session start in plugin context)
+  - For each candidate, walks up to find the file's git repo root and runs `git log --format="%ae" -1 -- {path}` from there
+  - Filter: keep files that are **untracked** OR **last-committed by the current user** (`git config user.email`); skip files committed by anyone else. This is how Matt-authored specs get ingested but Kevin-authored ones don't silently flood Matt's wiki
+  - Detects `.aela/wiki/` directories in sibling repos for the portal-page federation mechanism
+  - Health check uses `YAML.parse` (not `split(':')`) to find pages missing a `description:` field, so values containing colons no longer get truncated
 
 - **`hooks/stop-reflect.js` (Stop)** — blocks the first stop of each sequence with a reflection prompt asking whether anything from the turn is worth persisting. Uses the `stop_hook_active` input flag as the loop guard. The reflection prompt content is **not hardcoded in the hook** — the hook payload is a minimal one-liner that tells Claude to `wiki_read(wiki: 'aela', page: 'wiki-stop-hook')` and follow the page. The actual prompt lives as a wiki page shipped in the personal wiki template, so users customise by editing markdown, not JS. Same pattern applies to any other hook that needs guidance text: put the content in a wiki page, point the hook at it. Validated in matt-head 2026-04-13.
 
 - **Subagent cron** — `/check-comms` (once generalised) runs as a scheduled cron via the subagent pattern (see the "Running on a Loop — Subagent Pattern" section in matt-head's `wiki/codebase/pages/aela-voice.md`). The subagent-doesn't-inherit-CLAUDE.md gotcha and the subagent-hallucinates-deferred-tool-refusals gotcha both belong in the plugin README so they affect users scheduling any delegated work.
+
+### 7. External wiki federation via portal pages
+
+The 2026-04-13 wiki design spec introduced a federation pattern that the migration must preserve. The mechanism:
+
+- Collaborator wikis (e.g. Kevin's personal wiki living in a sibling repo's `.aela/wiki/`) are **not** merged into the local wiki. They're surfaced as **portal pages** in the local codebase wiki — one lightweight entry per external wiki in the main index.
+- A portal page's body = verbatim copy of the external wiki's `index.md`. The portal page's `description:` is a synthesised one-liner **filtered through what the local user cares about given their role** — it is deliberately not a neutral summary. Example: a portal for Kevin's wiki from Matt's perspective leads with the bits Matt is likely to drill into, not a balanced table of contents.
+- Drill-in happens on demand via `wiki_read(wiki: 'external', path: '<abs-path-to-wiki-dir>', page: '<page-name>')`. The external wiki is never cloned or cached — it's always read fresh from the filesystem path.
+- The maintenance hook already detects new and stale `.aela/wiki/` directories in sibling repos at session start and flags them for portal-page ingest. The plugin's equivalent maintenance hook must implement the same detection — it's the load-bearing mechanism for team federation.
+
+This is the reason `wiki_read`'s `wiki` parameter is a relaxed string rather than an enum: `'external'` is a sentinel that switches the resolver to the supplied `path`. The plugin must ship the external mode from day one, not defer it — portal pages are useless without it.
+
+### 8. Workspace-relative sourceIds
+
+After the 2026-04-13 wiki-maintenance rewrite, `raw/sources.md` records sourceIds as **workspace-relative paths** (`matt-head/docs/superpowers/specs/foo.md`) rather than project-relative (`docs/superpowers/specs/foo.md`). This is the only stable form across sibling-repo discovery: once the maintenance hook walks multiple project roots from a shared workspace root, project-relative paths collide.
+
+The plugin must standardise on workspace-relative sourceIds. Don't make the prefix scheme per-project configurable — that re-introduces the collision problem the rewrite solved.
+
+### 9. `yaml` dep is already present in the plugin
+
+The aela-voice plugin's TTS server already depends on `yaml@^2.8.3` for the personality YAML files (see `mcp-servers/tts/package.json`). The matt-head wiki store now uses the same library (`YAML.parse` / `YAML.stringify` round-trip, replacing a hand-rolled `split(':')` parser that silently truncated any frontmatter value containing a colon — commit `1b7f9e6`).
+
+When the wiki MCP server lands in the plugin, it reuses the existing `yaml` dep. No new package needed. The `mcp-servers/tts/personality.js` file is a usable reference for the round-trip pattern.
 
 ## Init Skills
 
@@ -342,14 +374,16 @@ See the **Init Skills** section below for the full `/comms-init` flow.
 2. **Phase 1 — Componentise MCP servers**:
    - Create `mcp-servers/wiki/server.js` by extracting wiki tools from `matt-head/src/mcp-server.js`. Dual-root support: personal (global, defaulting to `~/.claude/aela-wiki/`) + work (project-cwd, defaulting to `<cwd>/.aela-wiki/`). Both paths overridable via plugin options.
    - Port `src/wiki/store.js` as-is — the index generator already honours `fm.description` as a separate field from `fm.title`, which is the mechanic that makes the auto-generated index usable as a navigation layer. Don't collapse description into title during the port.
-   - Port the `wiki_write` tool description from `src/mcp-tools.js` verbatim — it instructs the caller to supply a meaningful one-line `description:` framed around "what's in the page" and "when would a reader drill in", not a title echo. This framing is load-bearing: without it, descriptions regress to title echoes within a few sessions and the index stops being useful. The tool description is the only enforcement mechanism — there is no runtime validator — so it has to ship as part of Phase 1, not as an afterthought.
+   - Port the `wiki_create` tool description from `src/mcp-tools.js` verbatim — it instructs the caller to supply a meaningful one-line `description:` framed around "what's in the page", not a title echo, and makes `title`/`category`/`description`/`body` all required so the model can't skip the framing. This is load-bearing: without it, descriptions regress to title echoes within a few sessions and the index stops being useful. The tool description is the only enforcement mechanism — there is no runtime validator — so it has to ship as part of Phase 1, not as an afterthought.
+   - Ship the `wiki-update` skill alongside the server. The skill reads the target page, performs targeted `Edit` calls against it (preserving frontmatter and untouched sections), then calls `wiki_update_index`. This is how existing pages are modified — there is deliberately no `wiki_update` MCP tool, because a whole-page rewrite API makes it too easy for the model to clobber context it didn't mean to touch. The skill is the enforcement mechanism for the "targeted edits, not rewrites" discipline.
+   - `wiki_read` supports a third mode, `wiki: 'external'` with a `path` argument, for reading a collaborator's wiki by filesystem path (e.g. Kevin's personal wiki living next to Matt's on a shared machine). Port this as-is — it's cheap, and it becomes useful the moment two users are both running the plugin on the same box or sharing a folder.
    - Ship a default `wiki-stop-hook` page in the personal wiki template so the `stop-reflect.js` hook has something to point at on a fresh install.
    - Create `mcp-servers/comms/server.js` if the generalised comms skill needs any state tools. May be empty initially.
    - Register both in `.mcp.json` alongside the existing TTS server.
 3. **Phase 1.5 — Add advisory file locking to wiki MCP server** (**hard prerequisite for Phase 6b**):
    - Integrate `proper-lockfile` (or equivalent).
-   - Every `wiki_write` / `wiki_update_index` / `wiki_log` follows: acquire lock → re-read → compute new content → atomic write (temp-and-rename) → release.
-   - Read operations remain lock-free (tolerant of stale content; atomic writes prevent torn reads).
+   - Every mutating path follows: acquire lock → re-read → compute new content → atomic write (temp-and-rename) → release. Mutating paths are `wiki_create`, `wiki_delete`, `wiki_update_index`, `wiki_log`, **and the Edit operations performed by the `wiki-update` skill** — the skill mutates files directly via Edit rather than through an MCP tool, so the locking has to live at a layer Edit also goes through. Options: (a) wrap the wiki directory with a filesystem-level advisory lock the skill respects via a pre-edit check, or (b) add a thin `wiki_edit_begin` / `wiki_edit_commit` pair that the skill uses to bracket its Edit calls. Option (b) is cleaner and keeps the locking boundary inside the MCP server where the rest of it already lives.
+   - Read operations (`wiki_read`, `wiki_search`, `wiki_list`) remain lock-free (tolerant of stale content; atomic writes prevent torn reads).
    - On re-read mismatch: merge if different section, return conflict error for caller retry if same section.
    - Document cloud-sync caveat (`wikiPath` on Dropbox/iCloud is out-of-scope for our locking; rely on cloud conflict resolution).
 4. **Phase 2 — Add `How I Remember` to personality**: apply the draft block to `personality/default.yaml`, including the empty-wiki bootstrap clause.
