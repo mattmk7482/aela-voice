@@ -85,8 +85,8 @@ function readOrientationPage(name) {
     const content = wikiRead('personal', name);
     return `### ${name}\n\n${content.trim()}\n`;
   } catch {
-    // wikiRead throws on missing — skip the page with a placeholder
-    return `### ${name}\n\n_(page not found — created on /wiki-init)_\n`;
+    // wikiRead throws on missing — skip the page entirely, no placeholder
+    return null;
   }
 }
 
@@ -119,9 +119,14 @@ sections.push('## Personal wiki index\n\n' + personalIndex.trim());
 const projectIndex = wikiList('project');
 sections.push('## Project wiki index\n\n' + projectIndex.trim());
 
-// 5. Orientation pages
-const pageSections = ORIENTATION_PAGES.map(readOrientationPage).join('\n---\n\n');
-sections.push('## Orientation pages (loaded in full)\n\n' + pageSections);
+// 5. Orientation pages — skip any page that doesn't exist yet
+const pageSections = ORIENTATION_PAGES
+  .map(readOrientationPage)
+  .filter(Boolean)
+  .join('\n---\n\n');
+if (pageSections) {
+  sections.push('## Orientation pages (loaded in full)\n\n' + pageSections);
+}
 
 const additionalContext = '# Wiki orientation\n\n' + sections.join('\n\n---\n\n') + '\n';
 
