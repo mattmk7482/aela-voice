@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import YAML from 'yaml';
@@ -28,10 +28,26 @@ export function readPersonality(pluginRoot) {
 
 /**
  * Write personality YAML back to disk. Always writes the user copy — never touches the template.
- * If the user copy doesn't exist yet, creates it by writing the passed values.
+ * Creates the user state directory if absent. Reads the existing user copy or template first
+ * and patches only the fields passed in, so unknown top-level fields (e.g. how_i_remember in
+ * Phase 4) are preserved across writes.
  */
-export function writePersonality(pluginRoot, { userName, companionName, personality }) {
-  const doc = { user_name: userName || '', companionName, personality };
+export function writePersonality(pluginRoot, patch) {
+  mkdirSync(USER_STATE_DIR, { recursive: true });
+
+  // Start from whatever's currently authoritative — user copy if present, template otherwise.
+  // If neither exists, start from an empty object so the passed patch becomes the whole file.
+  let doc = {};
+  const srcPath = personalityPath(pluginRoot);
+  if (existsSync(srcPath)) {
+    doc = YAML.parse(readFileSync(srcPath, 'utf-8')) || {};
+  }
+
+  // Map the camelCase patch keys to the YAML snake_case layout.
+  if ('userName' in patch) doc.user_name = patch.userName || '';
+  if ('companionName' in patch) doc.companionName = patch.companionName;
+  if ('personality' in patch) doc.personality = patch.personality;
+
   writeFileSync(USER_PERSONALITY_PATH, YAML.stringify(doc), 'utf-8');
 }
 
