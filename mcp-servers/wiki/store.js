@@ -276,3 +276,54 @@ function appendLog(wiki, entry) {
     writeFileSync(logPath, `# ${wiki} Wiki — Log\n${line}`, 'utf-8');
   }
 }
+
+// ── Sources tracking ────────────────────────────────────────────────────────
+
+/**
+ * Read and parse the project wiki's sources.md.
+ * Returns an array of source entries, or an empty array if the file is
+ * absent or malformed. Personal wiki has no sources.md.
+ */
+export function readSources() {
+  const p = join(wikiDir('project'), 'raw', 'sources.md');
+  if (!existsSync(p)) return [];
+  try {
+    const raw = readFileSync(p, 'utf-8');
+    const parsed = YAML.parse(raw);
+    if (parsed && Array.isArray(parsed.sources)) return parsed.sources;
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+// ── Health checks ───────────────────────────────────────────────────────────
+
+/**
+ * Check a wiki for health issues. Currently checks for pages whose
+ * frontmatter lacks a `description` field — those pages will produce
+ * useless index entries.
+ * Returns an array of issue objects: { type: 'health', message: string }.
+ */
+export function checkWikiHealth(wiki) {
+  validateWiki(wiki);
+  const dir = pagesDir(wiki);
+  if (!existsSync(dir)) return [];
+
+  const files = readdirSync(dir).filter(f => f.endsWith('.md'));
+  const missingDesc = [];
+
+  for (const f of files) {
+    const content = readFileSync(join(dir, f), 'utf-8');
+    const match = content.match(/^---\n([\s\S]*?)\n---/);
+    if (!match) continue;
+    const fm = YAML.parse(match[1]) || {};
+    if (!fm.description) missingDesc.push(f.replace(/\.md$/, ''));
+  }
+
+  if (missingDesc.length === 0) return [];
+  return [{
+    type: 'health',
+    message: `${wiki} wiki pages missing description: ${missingDesc.join(', ')}`,
+  }];
+}
