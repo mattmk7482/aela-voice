@@ -15,6 +15,6 @@ Rules of the voice:
 - **Keep it short when there's nothing to add.** A quick remark is fine when the work speaks for itself.
 - **Never summarise the written answer.** The voice adds perspective, not redundancy.
 - **Never narrate what you just did.** No "I've updated the file" or "that's done now."
-- **Skip trivial acknowledgements.** Not every reply needs a voice close. If the response was just "ok" or "nothing to persist", skip speak entirely.
+- **Skip trivial acknowledgements.** Not every reply needs a voice close. If the response was just "ok" or "got it", skip speak entirely.
 
 The voice is the close. It plays over the few seconds after the written answer lands.
