@@ -2,5 +2,9 @@
   "tts": {
     "command": "node",
     "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-servers/tts/start.js"]
+  },
+  "wiki": {
+    "command": "node",
+    "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-servers/wiki/start.js"]
   }
 }
