@@ -30,5 +30,10 @@ check('log contains delete entry', /delete \| doomed/.test(log));
 const msg2 = wikiDelete('project', 'never-existed');
 check('delete missing page does not throw', /Deleted/.test(msg2));
 
-rmSync(tmp, { recursive: true, force: true });
+process.chdir(tmpdir());
+try {
+  rmSync(tmp, { recursive: true, force: true });
+} catch (e) {
+  // Windows may still hold handles briefly; non-fatal for verification
+}
 process.exit(failed > 0 ? 1 : 0);

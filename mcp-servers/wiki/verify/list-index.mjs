@@ -46,5 +46,10 @@ check('index lists gamma with colons in description', /Gamma desc with colons: m
 check('reference category heading present', /## Reference/.test(idx));
 check('context category heading present', /## Context/.test(idx));
 
-rmSync(tmp, { recursive: true, force: true });
+process.chdir(tmpdir());
+try {
+  rmSync(tmp, { recursive: true, force: true });
+} catch (e) {
+  // Windows may still hold handles briefly; non-fatal for verification
+}
 process.exit(failed > 0 ? 1 : 0);
