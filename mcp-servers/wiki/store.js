@@ -13,9 +13,11 @@ import {
   readdirSync,
   mkdirSync,
   unlinkSync,
+  statSync,
 } from 'fs';
-import { join } from 'path';
+import { join, relative, resolve, dirname } from 'path';
 import { homedir } from 'os';
+import { execSync } from 'child_process';
 import YAML from 'yaml';
 
 export const VALID_WIKIS = ['personal', 'project'];
@@ -326,4 +328,101 @@ export function checkWikiHealth(wiki) {
     type: 'health',
     message: `${wiki} wiki pages missing description: ${missingDesc.join(', ')}`,
   }];
+}
+
+// ── Workspace source discovery ──────────────────────────────────────────────
+
+/**
+ * Walk WORKSPACE_ROOT for markdown files under docs/wiki-ingest/,
+ * docs/superpowers/specs/, and docs/superpowers/plans/ across every
+ * top-level sibling project. Filter by git authorship — keep files
+ * either untracked or last-committed by the current git user.
+ * Returns an array of { path, mtime } where path is workspace-relative
+ * (POSIX separators).
+ *
+ * WORKSPACE_ROOT env var overrides the default of one level above cwd.
+ * Single source of truth for source discovery — used by
+ * wiki-maintenance.js and the seed-sources CLI.
+ */
+export function discoverWorkspaceSources() {
+  const workspaceRoot = process.env.WORKSPACE_ROOT || resolve(process.cwd(), '..');
+  if (!existsSync(workspaceRoot)) return [];
+
+  const myEmail = currentUserEmail(workspaceRoot);
+  const results = [];
+
+  for (const entry of readdirSync(workspaceRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+    const projectDir = join(workspaceRoot, entry.name);
+
+    const candidates = findMdFilesUnder(projectDir, [
+      'docs/wiki-ingest',
+      'docs/superpowers/specs',
+      'docs/superpowers/plans',
+    ]);
+
+    for (const filePath of candidates) {
+      const repoRoot = findGitRoot(filePath) || projectDir;
+      const authorEmail = lastCommitAuthorEmail(filePath, repoRoot);
+      // Untracked files have no author email; keep them. Tracked
+      // files must match current git user.
+      if (authorEmail && myEmail && authorEmail !== myEmail) continue;
+
+      const sourceId = relative(workspaceRoot, filePath).replace(/\\/g, '/');
+      const stat = statSync(filePath);
+      results.push({
+        path: sourceId,
+        mtime: stat.mtime.toISOString(),
+      });
+    }
+  }
+
+  return results;
+}
+
+function currentUserEmail(cwd) {
+  try {
+    return execSync('git config user.email', { cwd, encoding: 'utf-8' }).trim();
+  } catch {
+    return '';
+  }
+}
+
+function lastCommitAuthorEmail(filePath, repoRoot) {
+  try {
+    const rel = relative(repoRoot, filePath).replace(/\\/g, '/');
+    return execSync(`git log --format="%ae" -1 -- "${rel}"`, {
+      cwd: repoRoot,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      encoding: 'utf-8',
+    }).trim();
+  } catch {
+    return '';
+  }
+}
+
+function findGitRoot(filePath) {
+  let dir = dirname(filePath);
+  while (true) {
+    if (existsSync(join(dir, '.git'))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+function findMdFilesUnder(root, subPatterns) {
+  const results = [];
+  function walk(dir) {
+    if (!existsSync(dir)) return;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith('.md')) results.push(full);
+    }
+  }
+  for (const pattern of subPatterns) {
+    walk(join(root, pattern));
+  }
+  return results;
 }
