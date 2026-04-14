@@ -1,0 +1,84 @@
+---
+name: comms-init
+description: Socratic comms onboarding. Walks through every communication service the user uses, opens each in a Chrome tab, explores the UI visually, asks pointed questions about priorities and navigation, and writes everything to the user's comms-sources wiki page as structured per-service prose. Re-run to add a new service later.
+---
+
+# comms-init
+
+Configure comms monitoring by having an actual conversation with the user about what they use and what matters. No templates, no static service adapters — this skill is where the per-user, per-service knowledge gets captured, one pointed question at a time.
+
+The output lives in `comms-sources` in the personal wiki. Future `/check-comms` runs read that page and scan accordingly. As `/check-comms` learns more about each service, it writes learnings back to the same page — so `comms-sources` grows smarter over time and this skill is only needed for the initial configuration and for adding new services.
+
+## Before starting
+
+1. **Check prerequisites.** `/wiki-init` must have run already — `comms-sources` needs to exist as a page (created empty by `/wiki-init`). If it doesn't exist, tell the user: "I need to run `/wiki-init` first to set up the wiki layer. Want me to do that now?" and invoke `/wiki-init` on yes, or stop on no.
+2. **Check for Chrome availability.** This skill is Chrome-driven. Call `tabs_context_mcp` to see if the extension is reachable. If it errors, tell the user: "I need the Chrome extension active for this skill — can you start Chrome and check that the extension is installed?" and stop until they confirm.
+3. **Re-run detection.** Read `comms-sources` via `wiki_read(wiki: "personal", page: "comms-sources")`. If it already has service sections configured, show the user what's there and ask whether they want to add a new service, update an existing one, or cancel. Re-running should never silently blow away prior configuration.
+
+## The socratic flow
+
+Ask open-ended questions one at a time. Write as you go — don't batch everything into a single wiki_update at the end. Each service's configuration is its own section in `comms-sources`, added incrementally.
+
+### Opening question
+
+> "What communication services do you use for work? It can be anything — corporate chat like Teams or Slack, email, project management tools like Linear or Jira, or anything else I can open in a browser and scan visually. List them all and we'll walk through each one."
+
+Take the list. For each service in turn, do the per-service walk below.
+
+### Per-service walk
+
+For each service the user named:
+
+**Step A — Open it.** Call `tabs_create_mcp` with the service's URL. If the user didn't give a URL, ask ("What URL do you use for <service>?"). Wait for the page to load. If the user needs to log in, tell them: "I'll pause here while you log in — let me know when you're ready."
+
+**Step B — Explore the UI.** Once logged in, take a screenshot via `browser_take_screenshot` (or the equivalent tool). Read the page visually. Identify the sidebar, the main content area, the navigation pattern. Don't guess — actually look at what's there.
+
+**Step C — Ask what matters.** Pointed questions, one at a time:
+
+- "Which <channels / chats / inboxes / lists> do you actually care about on this service? Walk me through them briefly." — Get the user to name the targets that matter.
+- For each target: "Is this one I should always check, or only check when you've got unread messages?" — priority tier.
+- "What am I looking for when I scan this one?" — the extraction target. Tasks? Decisions? Pipeline signal? Questions from someone specific?
+- "Is there anything about the UI or how this service works that would trip me up if I didn't know about it?" — user hands you the gotchas.
+- "Anything here you explicitly don't want me scanning?" — exclusions.
+
+Don't read from a form. Read from the actual page you're looking at. If you see something you don't understand, ask.
+
+**Step D — Write the section.** Once you have enough to write the per-service configuration, Edit the `comms-sources` page via `/wiki-update` to add a new section for this service. The section structure:
+
+```
+## <Service Name>
+
+**Opening:** <URL or instructions for opening the service in a Chrome tab>
+
+**Navigation:** <what the sidebar looks like, how to reach each target type, any quirks the user flagged>
+
+**Priority tiers:**
+
+- **Always check:** <targets the user named as always-check, with one-line reason for each>
+- **Check if unread:** <targets the user named as conditional>
+- **Skip unless asked:** <anything the user explicitly doesn't want scanned>
+
+**Extraction targets:** <what to look for when scanning — tasks, decisions, specific people's activity, whatever>
+
+**Scan tracking:** <placeholder for per-target timestamps, filled in by /check-comms>
+
+**Learnings:** <empty placeholder — /check-comms writes discoveries here over time>
+```
+
+Use `/wiki-update` to append the new section to the page. Preserve any existing sections from other services — the page grows by accumulation.
+
+**Step E — Move on.** Say "OK, <service> is configured. Moving on to the next one." Proceed to the next service in the list.
+
+## After all services
+
+Once every service the user listed has its own section in `comms-sources`, re-read the page and confirm it parses cleanly (sections have the expected structure, no duplicates). Show the user a terse summary: "Configured: <list of services>. You can run `/check-comms` now and it'll scan each one using what I just learned. Re-run `/comms-init` anytime to add a new service."
+
+## What to return
+
+3-5 lines: list of configured services, any notable gotchas the user flagged, whether the user wants to run `/check-comms` immediately.
+
+Do NOT return screenshots, raw page text, or verbose exploration logs. The visual context stays in your scanning turn — only the distilled configuration makes it to `comms-sources`.
+
+## Adding a new service later
+
+Re-running `/comms-init` on an already-configured install is the expected way to add a new service. The skill detects the existing configuration and asks which service to add, then walks through just that one service without touching the others.
