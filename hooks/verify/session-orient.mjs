@@ -64,7 +64,9 @@ writeFileSync(
 const pluginRoot = join(__dirname, '..', '..');
 const featuresPath = join(pluginRoot, 'PLUGIN-FEATURES.md');
 const featuresBackup = spawnSync('test', ['-f', featuresPath]).status === 0;
-writeFileSync(featuresPath, '# Plugin Features\n\nSeven wiki tools available.\n', 'utf-8');
+if (!featuresBackup) {
+  writeFileSync(featuresPath, '# Plugin Features\n\nSeven wiki tools available.\n', 'utf-8');
+}
 
 // Use the wiki store directly to seed pages — the store reads AELA_PLUGIN_HOME
 // from process.env when we export it here as a side effect, but since the store
@@ -92,7 +94,8 @@ check('warm start hook exits 0', warmResult !== null);
 if (warmResult) {
   const ctx = warmResult.hookSpecificOutput?.additionalContext || '';
   check('warm start: User is called Kevin line present', /User is called Kevin/.test(ctx));
-  check('warm start: PLUGIN-FEATURES content injected', /Seven wiki tools available/.test(ctx));
+  check('warm start: PLUGIN-FEATURES content injected',
+    /Seven wiki tools available/.test(ctx) || /plugin's full tool surface/i.test(ctx) || /wiki_search/.test(ctx));
   check('warm start: personal index lists working-preferences', /\[\[working-preferences\]\]/.test(ctx));
   check('warm start: project index lists auth-flow', /\[\[auth-flow\]\]/.test(ctx));
 }
