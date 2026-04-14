@@ -10,7 +10,16 @@ const personalRoot = join(tmp, 'fake-home', '.claude', 'aela-plugin', 'wiki');
 mkdirSync(personalRoot, { recursive: true });
 process.env.AELA_PLUGIN_HOME = join(tmp, 'fake-home');
 
-const { wikiCreate, wikiSearch } = await import('../store.js');
+const { wikiCreate, wikiSearch, wikiDir } = await import('../store.js');
+
+// Fail-fast: abort if AELA_PLUGIN_HOME is not honoured. Without this guard,
+// a broken wikiDir would silently write to the real personal wiki.
+const resolved = wikiDir('personal');
+if (!resolved.startsWith(process.env.AELA_PLUGIN_HOME)) {
+  console.error(`FAIL wikiDir('personal') = ${resolved}, expected to start with AELA_PLUGIN_HOME = ${process.env.AELA_PLUGIN_HOME}`);
+  console.error('Refusing to run — env isolation is broken, would pollute real personal wiki.');
+  process.exit(1);
+}
 
 let failed = 0;
 function check(label, cond, detail) {
