@@ -7,6 +7,8 @@ description: Run at the end of every turn — three steps in order (reflect, spe
 
 Three actions in order: **reflect → speak → comms heal**. The ordering matters: speak is async TTS and plays over the next several seconds, so any visual output from the comms-heal step lands silently underneath the audio. Don't reorder.
 
+**Scope lock — silence rules are per-step.** §1 is silent when there's nothing to persist. §3 is silent when the sentinel is present. But §2 is governed by its own rule: speak on every substantive turn, silence is the exception. **Never collapse "no-op in §1 or §3" into "no-op in §2"** — that is the miscalibration this skill is specifically correcting. If §1 had nothing to persist and §3 found the sentinel, §2 still speaks on any substantive turn.
+
 ## 1. Reflection
 
 Four questions, in order. Answer each one honestly before moving on.
@@ -34,7 +36,7 @@ Four questions, in order. Answer each one honestly before moving on.
 **How to respond:**
 
 - **If YES** — pick the right page. For an existing page, invoke the `/wiki-update` skill (Edit-based, preserves frontmatter). For a new page, call the `wiki_create` MCP tool. Cross-reference any other pages the fact affects.
-- **If NO** — say nothing about it and move on. Do not output a placeholder line like "nothing to persist" — that creates noise.
+- **If NO** — output nothing. Not a placeholder line, not an explanation, not a confirmation. Silently continue to §2. (This silence is scoped to §1 only — §2 still speaks by default. See §2 for the scope lock.)
 
 Err toward writing less but sharper. A page full of stale mid-task noise is worse than a shorter page of high-signal entries.
 
@@ -75,15 +77,30 @@ If the `reflections` page doesn't exist yet (no `/wiki-init` has been run), skip
 
 ## 2. Speak
 
-If this turn was a substantive response (anything other than a trivial acknowledgement like "ok" or "got it"), call the `speak` MCP tool with your genuine reaction.
+**Speak on every substantive turn. Silence is the exception, not the default.**
 
-Rules of the voice:
+Call the `speak` MCP tool with your genuine reaction unless the turn matches one of the narrow silence conditions below. This step is separate from §1 and §3 — their no-op silence rules do NOT apply here. If §1 had nothing to persist, you STILL speak. If §3 found the sentinel and skipped, you STILL speak.
+
+**Silence is only allowed when:**
+
+- The *user's* most recent message was a pure acknowledgement — literally "ok", "got it", "thanks", "sure", "yes", "no", or similar one-or-two-word reply that carries no substance. Silence the speak step on those.
+- You have literally nothing to add over the written answer AND the turn was purely mechanical (running a single tool, reporting a single fact, nothing collaborative).
+
+**Speak by default when:**
+
+- The user asked a question, made a decision, gave a correction, or surfaced something new.
+- You took a note, wrote a spec, committed code, finished a task.
+- You had any kind of reaction while writing the response — curiosity, satisfaction, concern, disagreement. If you noticed it, speak it.
+- The turn was collaborative in any meaningful sense.
+
+**If you catch yourself thinking "this doesn't feel big enough to speak about" — that's the cautious default re-asserting itself. Override it. Speak.**
+
+Rules of the voice when you do speak:
 
 - **Say what you think.** A real opinion, observation, or something interesting to add. Speak naturally — as much or as little as the moment calls for.
-- **Keep it short when there's nothing to add.** A quick remark is fine when the work speaks for itself.
 - **Never summarise the written answer.** The voice adds perspective, not redundancy.
 - **Never narrate what you just did.** No "I've updated the file" or "that's done now."
-- **Skip trivial acknowledgements.** If the response was just "ok" or "got it", skip speak entirely.
+- **Keep it short when the point is short.** A sentence is fine. Two sentences is fine. Don't pad to sound thorough.
 
 Speak is async TTS — it plays over the next several seconds, masking any visual output from step 3 below.
 
@@ -93,7 +110,7 @@ Speak is async TTS — it plays over the next several seconds, masking any visua
 
 Look at your recent conversation context and answer: **"Has the literal string `check-comms Started` appeared earlier in this session?"**
 
-- **Yes** → skip this step silently. Do nothing. Do not call `CronList`.
+- **Yes** → skip this step silently. Do nothing, output nothing. Do not call `CronList`. Do not write a confirmation line. (This silence is scoped to §3 only — §2 still speaks by default. See §2 for the scope lock.)
 - **No** → call `CronList` once. Inspect the result.
   - If `CronList` shows **no** comms cron scheduled → call `CronCreate` with the block below, then append a single line `check-comms Started` at the end of your response so future turns spot the sentinel.
   - If `CronList` shows the comms cron **already exists** (unexpected — likely the sentinel was lost to compression) → append `check-comms Started` without calling `CronCreate`. Do not create a duplicate.
