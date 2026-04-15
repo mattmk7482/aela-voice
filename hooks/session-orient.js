@@ -70,6 +70,28 @@ function readUserName() {
   }
 }
 
+// ── Blank-state detection ────────────────────────────────────────────────────
+
+/**
+ * Detect whether the user has not yet run /aela-init — meaning no
+ * personality.yaml exists, or the companion is still unnamed, or
+ * the user_name is empty. Returns true if onboarding is needed.
+ */
+function needsAelaInit() {
+  const base = process.env.AELA_PLUGIN_HOME || homedir();
+  const personalityPath = join(base, '.claude', 'aela-plugin', 'personality.yaml');
+  if (!existsSync(personalityPath)) return true;
+  try {
+    const raw = readFileSync(personalityPath, 'utf-8');
+    const parsed = YAML.parse(raw) || {};
+    if (!parsed.user_name || parsed.user_name.trim() === '') return true;
+    if (!parsed.companionName || parsed.companionName.trim() === '') return true;
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 // ── Plugin features doc ─────────────────────────────────────────────────────
 
 function readPluginFeatures() {
@@ -98,6 +120,13 @@ try { wikiUpdateIndex('personal'); } catch { /* non-fatal, probably no wiki yet 
 try { wikiUpdateIndex('project');  } catch { /* non-fatal */ }
 
 const sections = [];
+
+// Blank-state nudge — deterministic, only when nothing has been configured yet
+if (needsAelaInit()) {
+  sections.push(
+    '**No companion configured yet — run `/aela-init` to set up your companion\'s name, voice, and basic context.**'
+  );
+}
 
 // 1. User name
 const userName = readUserName();
