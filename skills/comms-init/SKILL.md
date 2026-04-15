@@ -12,7 +12,22 @@ The output lives in `comms-sources` in the personal wiki. Future `/check-comms` 
 ## Before starting
 
 1. **Check prerequisites.** `/wiki-init` must have run already — `comms-sources` needs to exist as a page (created empty by `/wiki-init`). If it doesn't exist, tell the user: "I need to run `/wiki-init` first to set up the wiki layer. Want me to do that now?" and invoke `/wiki-init` on yes, or stop on no.
-2. **Check for Chrome availability.** This skill is Chrome-driven. Call `tabs_context_mcp` to see if the extension is reachable. If it errors, tell the user: "I need the Chrome extension active for this skill — can you start Chrome and check that the extension is installed?" and stop until they confirm.
+2. **Check for the Claude-in-Chrome extension.** This skill is Chrome-driven. Call `tabs_context_mcp` to see if the extension is reachable. If it errors (the extension isn't connected), print this block verbatim — do not summarise or paraphrase:
+
+   > **The Claude-in-Chrome extension needs to be active before I can continue.**
+   >
+   > This skill uses your Chrome browser to open the communication services you'll configure (Teams, Slack, email, whatever). It talks to Chrome through a browser extension called **Claude in Chrome**. On first run, the extension needs to be connected to this Claude Code session.
+   >
+   > Steps to enable it:
+   >
+   > 1. **Open Chrome.** If Chrome isn't running, start it now.
+   > 2. **Find the Claude-in-Chrome extension icon.** Click the puzzle-piece "Extensions" icon in the top-right of Chrome's toolbar. You'll see a list of installed extensions. Look for **Claude in Chrome** (it has the Anthropic logo). If you don't see it in the list, the extension isn't installed — you can install it from the Chrome Web Store by searching for "Claude in Chrome" and clicking **Add to Chrome**.
+   > 3. **Pin the extension** (optional but recommended) by clicking the pin icon next to its entry in the Extensions dropdown. This keeps the icon visible in the toolbar so you don't have to dig through the dropdown every time.
+   > 4. **Click the Claude-in-Chrome icon** in the toolbar (or from the Extensions dropdown). A small popup will open showing the extension's connection state.
+   > 5. **Connect it to this session.** In the popup, there'll be a "Connect" or "Activate" button (exact wording may vary by extension version). Click it. The popup should update to show "Connected" or similar.
+   > 6. **Come back here and tell me when you're ready.** I'll re-check and continue from where we left off.
+
+   After printing the block, stop the skill and wait for the user to confirm before retrying the prerequisite check. Do not loop — one check, one print, one wait. When the user confirms, re-run `tabs_context_mcp` once. If it succeeds, continue. If it still errors, re-print the block and stop again.
 3. **Re-run detection.** Read `comms-sources` via `wiki_read(wiki: "personal", page: "comms-sources")`. If it already has service sections configured, show the user what's there and ask whether they want to add a new service, update an existing one, or cancel. Re-running should never silently blow away prior configuration.
 
 ## The socratic flow
