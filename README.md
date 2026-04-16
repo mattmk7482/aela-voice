@@ -112,7 +112,7 @@ Wiki bootstrap. Creates the personal wiki directory at `~/.claude/aela-plugin/wi
 - `team-state` — per-person tracking of colleagues' current work
 - `working-preferences` — how you want the companion to work with you
 - `user-profile` — who you are, seeded from `/aela-init`'s third question
-- `reflections` — user-specific things to watch for at turn-end, beyond the baseline
+- `reflections` — user-specific observation categories to watch for beyond the baseline
 - `comms-sources` — per-service configuration for comms scanning, populated by `/comms-init`
 
 Also creates `docs/wiki-ingest/` in your project for manually-flagged analysis documents. Scans the workspace for pre-existing ingestable sources (superpowers specs, plans, docs) and tells you if any are available.
@@ -142,9 +142,9 @@ Each server has its own `package.json` and `node_modules/`. Bootstrap is handled
 
 Each hook emits its output independently, so they compose without interfering with each other.
 
-### One Stop hook
+### UserPromptSubmit hook
 
-- **`hooks/turn-end.js`** — invokes the `/turn-end` skill at the end of every substantive response. Runs the three-step close: reflect (four questions), speak, comms self-heal.
+- **`hooks/user-prompt-submit.js`** — triggers the `/aela-hook` skill at the end of every turn. Runs the three-step close: reflect (four questions), speak, comms self-heal.
 
 ### Storage layout
 

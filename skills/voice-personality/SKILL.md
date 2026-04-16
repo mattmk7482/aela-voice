@@ -7,14 +7,6 @@ description: View or edit the voice companion's personality. Use when the user w
 
 Help the user view or modify their voice companion's personality.
 
-## How It Works
-
-The personality is stored as a YAML file at `${CLAUDE_PLUGIN_ROOT}/personality/default.yaml` with two fields:
-- `companionName` — the character's name (default: "Aela")
-- `personality` — the full personality text as a markdown template
-
-The template uses `{{userName}}` and `{{companionName}}` as placeholders that get replaced with real values at session start.
-
 ## Process
 
 1. Call `get_personality` to read the current YAML

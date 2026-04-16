@@ -11,7 +11,7 @@ import {
 
 import { speak } from './tts.js';
 import { play } from './playback.js';
-import { getTtsUrl, getVoice, setVoice } from './config.js';
+import { getTtsUrl, getVoice, setVoice, setTtsUrl } from './config.js';
 import { readPersonality, writePersonality } from './personality.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -102,6 +102,15 @@ const TOOLS = [
     },
   },
   {
+    name: 'set_tts_url',
+    description: 'Set the TTS server URL. Persists to plugin config.',
+    inputSchema: {
+      type: 'object',
+      properties: { url: { type: 'string', description: 'TTS server URL (e.g. http://192.168.1.247:8020)' } },
+      required: ['url'],
+    },
+  },
+  {
     name: 'mute',
     description: 'Mute voice output. speak calls will silently return until unmuted.',
     inputSchema: { type: 'object', properties: {} },
@@ -152,19 +161,24 @@ async function handleTool(name, args) {
       const res = await fetch(`${ttsBase}/speakers`);
       if (!res.ok) throw new Error(`Failed to fetch speakers (${res.status})`);
       const speakers = await res.json();
-      const current = getVoice(PLUGIN_ROOT);
+      const current = getVoice();
       const list = speakers.map(s => s.name === current ? `${s.name} (active)` : s.name).sort();
       return text(list.join('\n'));
     }
 
     case 'set_voice': {
-      setVoice(PLUGIN_ROOT, args.voice);
+      setVoice(args.voice);
       return text(`Voice set to: ${args.voice}`);
     }
 
     case 'get_voice': {
-      const current = getVoice(PLUGIN_ROOT);
+      const current = getVoice();
       return text(current);
+    }
+
+    case 'set_tts_url': {
+      setTtsUrl(args.url);
+      return text(`TTS server URL set to: ${args.url}`);
     }
 
     case 'upload_voice_sample': {

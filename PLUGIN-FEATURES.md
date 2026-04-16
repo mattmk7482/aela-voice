@@ -8,10 +8,12 @@ This file documents the plugin's full tool surface, contract pages, and behaviou
 
 ## Two wikis
 
-I maintain two wiki layers that persist across sessions. Both are loaded as indexes in the session-start Orientation section:
+The wiki is structured, persistent memory — the same kind of cross-session knowledge as the harness memory system, but organised around the user and their projects rather than flat files. Use it the same way you'd use memory: persist what future sessions need, skip what's derivable from code or git history.
 
-- **Personal wiki** (`wiki: "personal"`) — the user-scoped wiki at `~/.claude/aela-plugin/wiki/`. Spans every project. Holds tasks-active, team-state, working-preferences, user-profile, reflections, comms-sources, and the people and relationships in the user's orbit.
-- **Project wiki** (`wiki: "project"`) — the project-scoped wiki at `<project>/.aela/wiki/project/`. Holds implementation knowledge about the current codebase or body of work — patterns, gotchas, architectural notes.
+- **Personal wiki** (`wiki: "personal"`) — the user-scoped wiki at `~/.claude/aela-plugin/wiki/`. Spans every project. Holds who the user is, how they work, what they're doing, and the people in their orbit. Think of it as `user`, `feedback`, `project`, and `reference` memory — but structured into named pages with richer context.
+- **Project wiki** (`wiki: "project"`) — the project-scoped wiki at `<project>/.aela/wiki/project/`. Holds implementation knowledge about the current codebase — patterns, gotchas, architectural decisions. The things you'd want to know walking into this project cold.
+
+**How to use the wiki in conversation.** Both wiki indexes are loaded in your context at session start. When a topic comes up — a person, a subsystem, a task, a decision — scan the index for a matching page. If one exists, `wiki_read` it to pull in the detail. The indexes are your lookup layer; `wiki_read` is your drill-in. If the indexes don't obviously point at an answer, use `wiki_search` to find it by keyword across both wikis.
 
 ## Contract pages (already in your Orientation)
 
@@ -23,7 +25,7 @@ The session-orient hook injects these pages directly into my context at session 
 | `team-state` | personal | Per-person tracking of what colleagues are doing |
 | `working-preferences` | personal | Interaction rules: tone, autonomy, push-back, drafts-and-approvals |
 | `user-profile` | personal | Structural info about the user — role, responsibilities, relationships |
-| `reflections` | personal | User-specific extensions to the turn-end worth-persisting criteria |
+| `reflections` | personal | User-specific observation categories to watch for beyond the baseline worth-persisting criteria |
 | Aela wiki index | personal | Catalog of every personal wiki page with one-line descriptions |
 | Project wiki index | project | Catalog of every project wiki page with one-line descriptions |
 
@@ -47,7 +49,7 @@ Seven wiki tools exposed by `mcp__plugin_aela-voice_wiki__*`:
 
 Voice-related tools under `mcp__plugin_aela-voice_tts__*` (the ones relevant to conversation):
 
-- `speak` — TTS. Used by `/turn-end` to deliver the voice close. Async — plays over the next several seconds after return.
+- `speak` — TTS. Used by `/aela-hook` to deliver the voice close. Async — plays over the next several seconds after return.
 - `list_voices`, `set_voice`, `get_tts_settings`, `set_tts_settings` — voice configuration, used by `/aela-init` during onboarding.
 
 ## Skills
@@ -58,7 +60,7 @@ Voice-related tools under `mcp__plugin_aela-voice_tts__*` (the ones relevant to 
 - `/wiki-update` — Edit-based updates to existing wiki pages. Preserves frontmatter.
 - `/wiki-ingest` — automated source synthesis: reads flagged docs, updates the right wiki page, marks ingested.
 - `/check-comms` — scans configured communication services and routes findings to wiki pages. Shape-only — reads everything from `comms-sources`.
-- `/turn-end` — reflect → speak → comms self-heal. Reflection has four questions, documented below.
+- `/aela-hook` — reflect → speak → comms self-heal. Invoked via UserPromptSubmit hook. Reflection has four questions, documented below.
 
 ## Turn-end reflection criteria
 

@@ -5,9 +5,7 @@ description: Socratic comms onboarding. Walks through every communication servic
 
 # comms-init
 
-Configure comms monitoring by having an actual conversation with the user about what they use and what matters. No templates, no static service adapters — this skill is where the per-user, per-service knowledge gets captured, one pointed question at a time.
-
-The output lives in `comms-sources` in the personal wiki. Future `/check-comms` runs read that page and scan accordingly. As `/check-comms` learns more about each service, it writes learnings back to the same page — so `comms-sources` grows smarter over time and this skill is only needed for the initial configuration and for adding new services.
+Configure comms monitoring by walking through each service the user uses, asking pointed questions, and writing the configuration to `comms-sources` in the personal wiki.
 
 ## Before starting
 
@@ -46,7 +44,7 @@ For each service the user named:
 
 **Step A — Open it.** Call `tabs_create_mcp` with the service's URL. If the user didn't give a URL, ask ("What URL do you use for <service>?"). Wait for the page to load. If the user needs to log in, tell them: "I'll pause here while you log in — let me know when you're ready."
 
-**Step B — Explore the UI.** Once logged in, take a screenshot via `browser_take_screenshot` (or the equivalent tool). Read the page visually. Identify the sidebar, the main content area, the navigation pattern. Don't guess — actually look at what's there.
+**Step B — Explore the UI.** Once logged in, take a screenshot to understand the visual layout — sidebar, content area, navigation pattern. Then figure out the cheapest repeatable path: can you navigate to targets via URL patterns or JavaScript rather than clicking through the UI? Test `get_page_text` on a target page to see if it captures the content cleanly. Record the best extraction method and navigation approach in the template — discovery can be expensive, but the recorded process should be lean.
 
 **Step C — Ask what matters.** Pointed questions, one at a time:
 
@@ -63,21 +61,21 @@ Don't read from a form. Read from the actual page you're looking at. If you see 
 ```
 ## <Service Name>
 
-**Opening:** <URL or instructions for opening the service in a Chrome tab>
+**Opening:** <URL and steps to reach the service — include tab reuse if applicable>
 
-**Navigation:** <what the sidebar looks like, how to reach each target type, any quirks the user flagged>
+**Navigation:** <minimum steps to reach each target — e.g. "click #channel-name in sidebar", not a description of the sidebar>
+
+**Extraction method:** <cheapest way to get content — get_page_text / read_page / screenshot, per target if they differ>
 
 **Priority tiers:**
 
-- **Always check:** <targets the user named as always-check, with one-line reason for each>
-- **Check if unread:** <targets the user named as conditional>
-- **Skip unless asked:** <anything the user explicitly doesn't want scanned>
+- **Always check:** <targets, one-line reason each>
+- **Check if unread:** <targets>
+- **Skip unless asked:** <excluded targets>
 
-**Extraction targets:** <what to look for when scanning — tasks, decisions, specific people's activity, whatever>
+**Extraction targets:** <what to look for — tasks, decisions, specific people's activity>
 
-**Scan tracking:** <placeholder for per-target timestamps, filled in by /check-comms>
-
-**Learnings:** <empty placeholder — /check-comms writes discoveries here over time>
+**Scan tracking:** <per-target timestamps, updated by /check-comms>
 ```
 
 Use `/wiki-update` to append the new section to the page. Preserve any existing sections from other services — the page grows by accumulation.

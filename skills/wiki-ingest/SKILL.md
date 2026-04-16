@@ -5,14 +5,14 @@ description: Ingest flagged source documents into the wiki system. Reads superpo
 
 # wiki-ingest
 
-Automate the source-to-wiki synthesis loop. The `wiki-maintenance.js` hook flags source documents that need ingestion at session start. This skill is how those sources actually make it into the wiki.
+Process source documents flagged by the session-start maintenance hook into the wiki.
 
 ## When to use
 
 - **`/wiki-ingest`** with no argument — process every source flagged by the session-start maintenance hook, in order.
 - **`/wiki-ingest <path>`** — process one specific source. Useful when you want to target a single file without touching the others.
 
-Also invoked automatically by the `/turn-end` reflection when un-ingested sources are still pending.
+Also invoked automatically by the `/aela-hook` reflection when un-ingested sources are still pending.
 
 ## Inputs
 
@@ -48,10 +48,6 @@ For each source you are processing:
 - **An external wiki index** creates a portal page in the project wiki. The portal page's description is where the role-filter happens — it's not a neutral summary, it's "what in this external wiki is likely to matter to this user, given what I know about them."
 
 Err toward updating existing pages over creating new ones. The wiki grows through deepening, not proliferation. Create new pages only when no existing page is a natural home.
-
-## Concurrency
-
-`/wiki-update` uses the Edit tool, which provides optimistic concurrency via `old_string` matching. If another session has modified the target page since you read it, your Edit will throw a clean error. Read the page fresh and retry. Don't try to build a locking mechanism around this — the Edit semantics are sufficient.
 
 ## What to return
 

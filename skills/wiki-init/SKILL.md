@@ -26,7 +26,7 @@ All six live in the personal wiki (`wiki: "personal"`):
 2. **`team-state`** — per-person tracking of what colleagues are currently working on. One section per person (populated over time), plus an "Active multi-person threads" section. Category: `context`.
 3. **`working-preferences`** — how the user wants to be worked with. Tone, autonomy level, when to push back, when to ask before doing. Category: `preference`.
 4. **`user-profile`** — structural info about the user: role, responsibilities, relationships, stable traits. This is where the work-description seed from `/aela-init` goes. Category: `person`.
-5. **`reflections`** — user-specific extensions to the turn-end worth-persisting criteria. What to watch for beyond the baseline, calibrated to the user's day-to-day work. Category: `preference`.
+5. **`reflections`** — user-specific observation categories to watch for beyond the baseline worth-persisting criteria, calibrated to the user's day-to-day work. Category: `preference`.
 6. **`comms-sources`** — per-service configuration for `/check-comms`. Left empty or as a placeholder with a "configured by /comms-init" note. Category: `context`.
 
 For each page, call `wiki_create` with:
@@ -43,10 +43,10 @@ These are the description fields that will appear in the personal wiki index. Wr
 
 - `tasks-active` — "The user's committed work queue with Now/Next/Blocked/Watch/Done sections — session-orient injects this in full, so check it first before asking what the user is working on."
 - `team-state` — "Per-person tracking of what people in the user's orbit are currently doing, plus active multi-person threads — session-orient injects this in full."
-- `working-preferences` — "How the user wants to be worked with — tone, autonomy level, when to push back. Read at turn-end Question 3 when deciding whether an interaction preference update is warranted."
+- `working-preferences` — "How the user wants to be worked with — tone, autonomy level, when to push back."
 - `user-profile` — "Structural info about the user — role, responsibilities, stable traits. Slow-changing. Updated only when something load-bearing shifts."
-- `reflections` — "User-specific extensions to the turn-end worth-persisting criteria. Read at turn-end Question 1 alongside the baseline, and grown by turn-end Question 4 when a new recurring category becomes visible."
-- `comms-sources` — "Per-service configuration for /check-comms — which services, which channels, priority rules, navigation hints, scan-tracking timestamps. Populated by /comms-init, grown by /check-comms as it learns."
+- `reflections` — "User-specific observation categories to watch for beyond the baseline worth-persisting criteria, shaped by the user's day-to-day work."
+- `comms-sources` — "Per-service configuration for /check-comms — which services, which channels, priority rules, navigation hints, scan-tracking timestamps."
 
 ### Starter bodies
 
@@ -126,7 +126,7 @@ _(how the user relates to their team, their org, their customers — learned thr
 ```
 ## Watch list
 
-_(user-specific categories to check at turn-end Question 1, beyond the role-neutral baseline. Grown by turn-end Question 4 when a new recurring category becomes visible. Filter: would this appear on the user's job spec if job specs were honest?)_
+_(user-specific observation categories to watch for beyond the baseline — shaped by the user's day-to-day work, refined over time)_
 ```
 
 **`comms-sources`** body:

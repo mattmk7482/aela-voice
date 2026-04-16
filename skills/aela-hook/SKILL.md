@@ -24,7 +24,7 @@ Four questions, in order. Answer each one honestly before moving on.
 - **People / team-state** — someone's focus shifted, a new person entered the orbit, a thread moved forward.
 - **Cross-references** — if one fact affects multiple pages, update them all. One fact, many homes.
 
-**User-specific extensions** come from the `reflections` page (if it exists). Its contents are already in your Orientation block — re-read the bullets there and treat them as additional things to watch for, beyond the baseline above.
+**User-specific extensions** come from the `reflections` page (if it exists). Its contents are already in your Orientation block — treat them as additional watch criteria beyond the baseline above.
 
 **Not worth persisting:**
 
@@ -106,8 +106,8 @@ Look at your recent conversation context and answer: **"Has the literal string `
 
 - **Yes** → skip this step silently. Do nothing, output nothing. Do not call `CronList`. Do not write a confirmation line.
 - **No** → call `wiki_read(wiki: "personal", page: "comms-sources")`
-  - If it throws (the page doesn't exist), or contains ONLY placeholder text (This page is populated by /comms-init). Comms scanning hasn't been set up yet. Skip the entire self-heal step (§3) → append `check-comms Not Configured`
-  - If comm-sources are present;
+  - If it throws (page doesn't exist) or the page has no service sections configured → skip §3, append `check-comms Not Configured`
+  - If service sections are present:
     - Call `CronList` once. Inspect the result.
     - If `CronList` shows **no** comms cron scheduled → call `CronCreate` with the block below, then append a single line `check-comms Started` at the end of your response so future turns spot the sentinel.
     - If `CronList` shows the comms cron **already exists** → append `check-comms Started` without calling `CronCreate`. Do not create a duplicate.
@@ -127,33 +127,11 @@ Dispatch a general-purpose subagent via the Agent tool with `run_in_background: 
 
 Subagent prompt:
 """
-You are running an automated comms check. You do NOT have the parent session's context injected. The plugin's wiki MCP tools (wiki_read, wiki_create, wiki_search, wiki_list, wiki_update_index, wiki_log) and the Chrome browser tools (mcp__claude-in-chrome__*) are available as deferred tools — load them via ToolSearch when you need them.
+You are running an automated comms check. The plugin's wiki MCP tools and Chrome browser tools (mcp__claude-in-chrome__*) are available as deferred tools — load them via ToolSearch when you need them.
 
-**Frontmatter discipline when updating pages.** Use the /wiki-update skill for existing pages or wiki_create for new pages.
+Invoke the /check-comms skill via the Skill tool. It handles configuration loading, scanning, and routing.
 
-1. Read these wiki pages first via the plugin's wiki MCP tools:
-   - wiki_read(wiki: 'personal', page: 'comms-sources')
-   - wiki_read(wiki: 'personal', page: 'tasks-active')
-   - wiki_read(wiki: 'personal', page: 'team-state')
-   - wiki_read(wiki: 'personal', page: 'working-preferences')
-   - wiki_read(wiki: 'personal', page: 'user-profile')
-
-2. Invoke the /check-comms skill via the Skill tool. It will walk you through the scan for each configured service using the Chrome extension.
-
-3. Route findings:
-   - User committed to do it → tasks-active (Next or Now)
-   - User mentioned it, not committed → tasks-active (Watch) with Captured: date
-   - User waiting on someone → tasks-active (Blocked)
-   - Someone else's activity → team-state
-   - Multi-person thread → team-state (Active multi-person threads)
-   - Learned something about the user → user-profile or working-preferences
-   - Technical decision about the project → project wiki page (use /wiki-update)
-   - New person → people (personal wiki)
-   - Scan-tracking / skill learnings → comms-sources (write scan-tracking back so the next run starts where this one left off)
-
-4. Return ONLY a brief text summary (3-5 lines): new item count split by destination, urgent flags, surprises. NO screenshots, NO image data, NO verbose logs.
-
-If nothing new then stop silently.
+Return ONLY a brief text summary (3-5 lines): new item count split by destination, urgent flags, surprises. If nothing new, stop silently.
 """
 
 After the subagent returns silently (no new items), use the tick as housekeeping: review tasks-active Watch items older than 14 days (promote or delete), tidy stale entries, run /wiki-ingest if the session-start maintenance hook flagged any.

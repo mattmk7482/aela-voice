@@ -62,7 +62,7 @@ export async function fetchTTS(text, voice, retries = 2) {
 // ── Speak ───────────────────────────────────────────────────────────────────
 
 export async function speak({ text, voice, pluginRoot }) {
-  const activeVoice = voice ?? getVoice(pluginRoot);
+  const activeVoice = voice ?? getVoice();
   const sentences = splitSentences(text);
   if (sentences.length === 0) return;
 
