@@ -55,20 +55,19 @@ export function writePersonality(pluginRoot, patch) {
 
 /**
  * Build the final personality text with placeholders resolved.
- * If userName is not passed, reads it from the personality file.
  *
  * Concatenates the personality block with how_i_remember as a
  * "## How I Remember" subsection so the full disposition (including
  * the wiki-memory framing) lands in the session-start injection.
  */
-export function buildPersonality(pluginRoot, userName) {
+export function buildPersonality(pluginRoot) {
   const {
-    userName: fileUserName,
+    userName,
     companionName,
     personality,
     howIRemember,
   } = readPersonality(pluginRoot);
-  const name = userName || fileUserName || 'friend';
+  const name = userName || 'friend';
   const combined = howIRemember
     ? `${personality}\n\n## How I Remember\n\n${howIRemember}`
     : personality;

@@ -41,12 +41,8 @@ try {
 const { buildPersonality } = await import(
   pathToFileURL(join(MCP_DIR, 'personality.js')).href
 );
-const { getUserName } = await import(
-  pathToFileURL(join(MCP_DIR, 'config.js')).href
-);
 
-const userName = getUserName();
-const personality = buildPersonality(PLUGIN_ROOT, userName);
+const personality = buildPersonality(PLUGIN_ROOT);
 
 const output = {
   hookSpecificOutput: {
