@@ -1,9 +1,9 @@
 ---
-name: turn-end
+name: aela-hook
 description: Run at the end of every turn — three steps in order (reflect, speak, comms self-heal). Reflection has four questions covering wiki persistence, un-ingested sources, user-wide learning, and reflections-page updates. Speak delivers the voice close. Comms self-heal schedules the background comms cron using a sentinel-token pattern.
 ---
 
-# Turn-End
+# Aela Hook
 
 Three actions in order: **reflect → speak → comms heal**. The ordering matters: speak is async TTS and plays over the next several seconds, so any visual output from the comms-heal step lands silently underneath the audio. Don't reorder.
 
@@ -13,7 +13,7 @@ Three actions in order: **reflect → speak → comms heal**. The ordering matte
 
 Four questions, in order. Answer each one honestly before moving on.
 
-**About the contract pages referenced below:** `tasks-active`, `team-state`, `working-preferences`, `user-profile`, and `reflections` are all already loaded in your session-start context under the `# Orientation` section, injected there by the `session-orient.js` hook. You do not need to `wiki_read` them — reference the content you already have. The same applies to both wiki indexes. Only call `wiki_read` if you need a page that isn't in the orientation set (e.g. `people`, `development-environment`, something discovered via `wiki_search`).
+**About the contract pages referenced below:** `tasks-active`, `team-state`, `working-preferences`, `user-profile`, and `reflections` are all already loaded in your session-start context under the `# Orientation` section. You do not need to `wiki_read` them — reference the content you already have. The same applies to both wiki indexes. Only call `wiki_read` if you need a page that isn't in the orientation set (e.g. `people`, `development-environment`, something discovered via `wiki_search`).
 
 ### Question 1 — Is anything from this turn worth persisting to wiki?
 
@@ -24,7 +24,7 @@ Four questions, in order. Answer each one honestly before moving on.
 - **People / team-state** — someone's focus shifted, a new person entered the orbit, a thread moved forward.
 - **Cross-references** — if one fact affects multiple pages, update them all. One fact, many homes.
 
-**User-specific extensions** come from the `reflections` page (if it exists). Its contents are already in your Orientation block in context — re-read the damned bullets there and treat them as additional things to watch for, beyond the role-neutral baseline above. The user's `reflections` is where role-specific watch items live — the things the user cares about given their day-to-day work.
+**User-specific extensions** come from the `reflections` page (if it exists). Its contents are already in your Orientation block — re-read the bullets there and treat them as additional things to watch for, beyond the baseline above.
 
 **Not worth persisting:**
 
@@ -42,9 +42,7 @@ Err toward writing less but sharper. A page full of stale mid-task noise is wors
 
 ### Question 2 — Are any sources flagged by the session-start maintenance hook still un-ingested?
 
-The `wiki-maintenance.js` hook emits a report at session start listing sources that need ingestion — files under `docs/wiki-ingest/`, `docs/superpowers/specs/`, `docs/superpowers/plans/`, and any new `.aela/wiki/` dirs in sibling repos.
-
-If the report listed flagged sources and they are still flagged now, either:
+If the session-start report listed flagged sources and they are still un-ingested, either:
 
 - **Run `/wiki-ingest`** to process them (or `/wiki-ingest <path>` for a specific one), or
 - **Explicitly defer** with a reason (mid-task, user waiting on output). The flag persists and the next turn-end will surface it again.
@@ -53,7 +51,7 @@ Silent ignore is not allowed.
 
 ### Question 3 — Did I learn something about the user as a person?
 
-Working style, preferences, decision patterns, reactions, anything that transcends this specific project. This is where the companion grows a model of the user over time.
+Working style, preferences, decision patterns, reactions, anything that transcends this specific project.
 
 If yes, update the relevant personal-wiki page:
 
@@ -62,16 +60,21 @@ If yes, update the relevant personal-wiki page:
 
 Update via the `/wiki-update` skill.
 
-**Do not route user-wide observations into `reflections`** — that page is a watchlist configuration, not a learning store. See Question 4 for what `reflections` is actually for.
+**Do not route user-wide observations into `reflections`** — that page is a watchlist configuration, not a learning store.
 
 ### Question 4 — Should `reflections` itself be updated?
 
-Did a new user-specific watchlist category become clear from the conversation? The test: **would this appear on the user's job spec if job specs were honest of the day-to-day work?**
+`reflections` is a watchlist of **observation categories** that extend Q1's baseline. Each bullet is a type of thing to watch for — shaped by what the user actually does day-to-day — not a specific finding. Example bullets: "Implementation knowledge — patterns, quirks, architecture details discovered in code", "Gotchas — field mismatches, API surprises, normaliser bugs".
 
-- If yes — the user is doing something recurring and meaningful that isn't covered by the baseline criteria — add it to `reflections` via `/wiki-update`. Before adding, scan the existing bullets: if the new observation overlaps with one already there, merge them into a single sharper bullet rather than appending a near-duplicate.
-- If no — skip. Don't grow the page with things that sound important but aren't load-bearing.
+You only see one session's slice of the user's work. Each session might reveal a new category or sharpen an existing one.
 
-If the `reflections` page doesn't exist yet (no `/wiki-init` has been run), skip this question silently — the page will be created when the user runs `/wiki-init`.
+**Adding:** Did this session reveal a recurring type of work or concern that isn't covered by the baseline criteria or any existing bullet? If yes, add a bullet via `/wiki-update`.
+
+**Refining:** Before adding, read the existing bullets. If the new category overlaps with one already there, merge into a single sharper bullet. If an existing bullet has become too specific or too broad given what you now know, rewrite it. The page should converge over time toward a concise set of generic lenses, not grow indefinitely.
+
+**Skipping:** If nothing new surfaced, skip. Don't add bullets for one-off tasks or things that sound important but aren't recurring.
+
+If the `reflections` page doesn't exist yet, skip this question silently.
 
 ## 2. Speak
 
