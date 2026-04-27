@@ -51,6 +51,16 @@ check('hook exits 0', result.status === 0, `stderr: ${result.stderr}`);
 check('hook output mentions un-ingested spec', /thing\.md/.test(result.stdout), result.stdout);
 check('hook output flags external wiki', /proj-b\/\.aela\/wiki/.test(result.stdout), result.stdout);
 
+// ── Current project's own .aela/wiki is not flagged as external ─────────────
+// Seeding proj-a's own wiki dir then re-running the hook with cwd: proj-a
+// must NOT flag proj-a/.aela/wiki — that's the project wiki for the session,
+// not external to it.
+
+mkdirSync(join(projA, '.aela', 'wiki', 'project', 'pages'), { recursive: true });
+const resultSelf = runHook();
+check('hook does not flag current project as external wiki', !/proj-a\/\.aela\/wiki/.test(resultSelf.stdout), resultSelf.stdout);
+check('hook still flags sibling external wiki', /proj-b\/\.aela\/wiki/.test(resultSelf.stdout), resultSelf.stdout);
+
 // ── After seeding sources.md, the spec should no longer be flagged ──────────
 
 const sourcesDir = join(projA, '.aela', 'wiki', 'project', 'raw');

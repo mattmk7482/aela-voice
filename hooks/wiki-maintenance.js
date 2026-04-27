@@ -14,7 +14,7 @@
  */
 
 import { readdirSync, existsSync } from 'fs';
-import { join, resolve } from 'path';
+import { basename, join, resolve } from 'path';
 
 import { readSources, checkWikiHealth, discoverWorkspaceSources } from '../mcp-servers/wiki/store.js';
 
@@ -59,8 +59,15 @@ function checkExternalWikis() {
   const issues = [];
 
   if (!existsSync(WORKSPACE_ROOT)) return issues;
+
+  // The current project's own .aela/wiki is the project wiki being used in
+  // this session — not external to the work. Skip it from the sibling scan
+  // or it gets flagged every session as a "new external wiki".
+  const currentProject = basename(process.cwd());
+
   for (const entry of readdirSync(WORKSPACE_ROOT, { withFileTypes: true })) {
     if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+    if (entry.name === currentProject) continue;
     const wikiPath = join(WORKSPACE_ROOT, entry.name, '.aela', 'wiki');
     if (!existsSync(wikiPath)) continue;
 

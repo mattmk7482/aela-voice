@@ -115,7 +115,7 @@ Look at your recent conversation context and answer: **"Has the literal string `
 **CronCreate parameters:**
 
 ```
-cron: "*/20 * * * *"
+cron: "13 * * * *"
 recurring: true
 prompt: (the prompt block below, verbatim)
 ```
