@@ -1,11 +1,16 @@
 ---
 name: check-comms
 description: Scan the user's configured communication services for new tasks, decisions, and knowledge. Extracts findings into the personal and project wikis. Shape-only — all service-specific configuration (which services, which channels, navigation hints) lives in the user's comms-sources wiki page, populated by /comms-init.
+model: sonnet
 ---
 
 # Check Communications
 
 Scan each communication service the user has configured for new messages since the last check, extract tasks and knowledge, and route findings to the right wiki pages.
+
+## Execution-context expectations
+
+This skill is designed for **Sonnet + medium thinking** budget. The work is mechanical browser-automation extraction with judgment calls on routing — not deep reasoning. Recurring use (hourly cron) compounds cost, so Opus is overkill. If you are dispatched from a parent agent, ensure your Agent call sets `model: "sonnet"` and embeds a `think hard` keyword in the prompt. The `model: sonnet` frontmatter above pins the skill at the runtime level (where supported). This rule is also encoded in the user's `working-preferences` page under "Cost-aware model selection on routine automation".
 
 Read all configuration from the user's `comms-sources` wiki page. To add a new service, re-run `/comms-init`.
 
