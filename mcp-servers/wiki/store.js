@@ -385,8 +385,7 @@ export function checkWikiHealth(wiki) {
 // ── Workspace source discovery ──────────────────────────────────────────────
 
 /**
- * Walk WORKSPACE_ROOT for markdown files under docs/wiki-ingest/,
- * docs/superpowers/specs/, and docs/superpowers/plans/ across every
+ * Walk WORKSPACE_ROOT for markdown files under docs/wiki-ingest/ across every
  * top-level sibling project. Filter by git authorship — keep files
  * either untracked or last-committed by the current git user.
  * Returns an array of { path, mtime } where path is workspace-relative
@@ -407,10 +406,18 @@ export function discoverWorkspaceSources() {
     if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
     const projectDir = join(workspaceRoot, entry.name);
 
+    // Only the explicit opt-in channel. `docs/superpowers/specs` and
+    // `docs/superpowers/plans` were discovered here until 2026-08-18 — the idea
+    // was to index delivered designs as reachable documentation, but in practice
+    // any feature big enough to be worth indexing evolves well past its spec
+    // through testing and decisions that never make it back into those files, so
+    // they are near-worthless as a record of what was actually built. Targeted
+    // code analysis answers "how does X work" better and is always current.
+    // They also swamped the signal: 356 flagged sources on one workspace, mostly
+    // per-task plan files and PROGRESS.md, which is not a list anyone can act on.
+    // To ingest a design doc now, put it under docs/wiki-ingest/ deliberately.
     const candidates = findMdFilesUnder(projectDir, [
       'docs/wiki-ingest',
-      'docs/superpowers/specs',
-      'docs/superpowers/plans',
     ]);
 
     for (const filePath of candidates) {

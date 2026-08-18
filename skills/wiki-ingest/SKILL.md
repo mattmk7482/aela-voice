@@ -1,6 +1,6 @@
 ---
 name: wiki-ingest
-description: Ingest flagged source documents into the wiki system. Reads superpowers specs, plans, analysis docs, and external wiki directories, decides which wiki page each affects, updates via /wiki-update, and marks the source as ingested in sources.md.
+description: Ingest flagged source documents into the wiki system. Reads documents deliberately placed under a project's docs/wiki-ingest/, plus external wiki directories, decides which wiki page each affects, updates via /wiki-update, and marks the source as ingested in sources.md. Superpowers specs and plans are NOT discovered automatically — pass a path explicitly to ingest one.
 ---
 
 # wiki-ingest
@@ -18,7 +18,7 @@ Also invoked automatically by the `/aela-hook` reflection when un-ingested sourc
 
 Sources are tracked in the project wiki's `sources.md` at `<project-root>/.aela/wiki/project/raw/sources.md`. The file is YAML. Each entry has:
 
-- `path` — workspace-relative path (e.g. `matt-head/docs/superpowers/specs/2026-04-13-wiki-design.md`)
+- `path` — workspace-relative path (e.g. `matt-head/docs/wiki-ingest/2026-04-13-wiki-design.md`)
 - `mtime` — file modification time
 - `ingested` — boolean; `true` means already processed
 - `ingested_at` — date processed (only present if `ingested: true`)
@@ -30,7 +30,7 @@ The hook's session-start report lists sources where `ingested: false` OR where t
 
 For each source you are processing:
 
-1. **Read the source file.** Use the `Read` tool with the absolute path. Workspace-relative source IDs are relative to the directory one level above the current project root (the `WORKSPACE_ROOT`). For example, `matt-head/docs/superpowers/specs/wiki-design.md` from a cwd of `C:/devworkspace/matt-head/` resolves to `C:/devworkspace/matt-head/docs/superpowers/specs/wiki-design.md`. If the source is a `.aela/wiki/` directory (an external wiki), read its `index.md` instead.
+1. **Read the source file.** Use the `Read` tool with the absolute path. Workspace-relative source IDs are relative to the directory one level above the current project root (the `WORKSPACE_ROOT`). For example, `matt-head/docs/wiki-ingest/wiki-design.md` from a cwd of `C:/devworkspace/matt-head/` resolves to `C:/devworkspace/matt-head/docs/wiki-ingest/wiki-design.md`. If the source is a `.aela/wiki/` directory (an external wiki), read its `index.md` instead.
 2. **Decide which wiki page(s) the source affects.** Ask: "what is this source actually about, and which existing wiki page would benefit from knowing this?" Possibilities:
    - An existing page in the project wiki whose topic overlaps — update it via `/wiki-update`.
    - An existing page in the personal wiki (usually structural — `user-profile`, `team-state`, `people`, `working-preferences`) — update it via `/wiki-update`.
