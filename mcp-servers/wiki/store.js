@@ -28,6 +28,37 @@ function validateWiki(wiki) {
   }
 }
 
+/**
+ * Parse a page's frontmatter block. Single source of truth — every caller that
+ * needs frontmatter goes through here.
+ *
+ * Tolerates CRLF and a leading BOM. This matters: on Windows, git's default
+ * `core.autocrlf=true` writes CRLF on checkout while storing LF, so an LF-only
+ * `/^---\n/` silently fails to match on any page that has been checked out.
+ * The caller then falls back to defaults, and the page lands in the index as
+ * `<page-name>` under `uncategorised` with no error anywhere. Found 2026-08-18
+ * with 27 of 45 project pages and 2 personal pages in that state — roughly 60%
+ * of a wiki effectively unfindable, which is the whole point of the index.
+ *
+ * Returns { fm, body, error }:
+ *   fm     parsed frontmatter object, or {} if absent/unparseable
+ *   body   everything after the frontmatter block (the raw text if absent)
+ *   error  message string when a frontmatter block exists but is invalid YAML
+ *
+ * Errors are RETURNED, not thrown, so a single malformed page degrades to a
+ * weak index entry instead of aborting a whole-wiki operation.
+ */
+function parseFrontmatter(raw) {
+  const text = raw.replace(/^﻿/, '');
+  const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  if (!match) return { fm: {}, body: text, error: null };
+  try {
+    return { fm: YAML.parse(match[1]) || {}, body: match[2], error: null };
+  } catch (e) {
+    return { fm: {}, body: match[2], error: e.message };
+  }
+}
+
 export function wikiDir(wiki) {
   validateWiki(wiki);
   if (wiki === 'personal') {
@@ -152,11 +183,15 @@ export function wikiUpdateIndex(wiki) {
   if (files.length === 0) return 'No pages in wiki.';
 
   const pages = [];
+  const problems = [];
   for (const f of files) {
     const raw = readFileSync(join(dir, f), 'utf-8');
     const name = f.replace(/\.md$/, '');
-    const match = raw.match(/^---\n([\s\S]*?)\n---/);
-    const fm = match ? (YAML.parse(match[1]) || {}) : {};
+    const { fm, error } = parseFrontmatter(raw);
+    // Name the file. A bare "line 2, column 14" across dozens of pages is not
+    // a diagnosis, and one bad page must not abort the whole rebuild.
+    if (error) problems.push(`${name}: ${error.split('\n')[0]}`);
+    else if (!fm.description) problems.push(`${name}: no description — indexed by name only`);
     pages.push({
       name,
       title: fm.title || name,
@@ -192,7 +227,14 @@ export function wikiUpdateIndex(wiki) {
   const content = lines.join('\n');
   const indexPath = join(wikiDir(wiki), 'index.md');
   writeFileSync(indexPath, content, 'utf-8');
-  return `Updated ${wiki} wiki index (${pages.length} pages, ${cats.length} categories).`;
+
+  let msg = `Updated ${wiki} wiki index (${pages.length} pages, ${cats.length} categories).`;
+  if (problems.length > 0) {
+    // Surface weak entries loudly — an index entry nobody can match on is the
+    // same as the page not existing.
+    msg += `\n${problems.length} page(s) will be hard to find:\n  - ${problems.join('\n  - ')}`;
+  }
+  return msg;
 }
 
 export function wikiSearch(query) {
@@ -212,9 +254,7 @@ export function wikiSearch(query) {
       const raw = readFileSync(join(dir, file), 'utf-8');
       const name = file.replace(/\.md$/, '');
 
-      const match = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
-      const fm = match ? (YAML.parse(match[1]) || {}) : {};
-      const body = match ? match[2] : raw;
+      const { fm, body } = parseFrontmatter(raw);
 
       const titleText = (fm.title || name).toLowerCase();
       const descriptionText = (fm.description || '').toLowerCase();
@@ -314,20 +354,32 @@ export function checkWikiHealth(wiki) {
 
   const files = readdirSync(dir).filter(f => f.endsWith('.md'));
   const missingDesc = [];
+  const unreadable = [];
 
   for (const f of files) {
     const content = readFileSync(join(dir, f), 'utf-8');
-    const match = content.match(/^---\n([\s\S]*?)\n---/);
-    if (!match) continue;
-    const fm = YAML.parse(match[1]) || {};
-    if (!fm.description) missingDesc.push(f.replace(/\.md$/, ''));
+    const name = f.replace(/\.md$/, '');
+    const { fm, error } = parseFrontmatter(content);
+    // Previously this `continue`d whenever the frontmatter regex failed to
+    // match — so it skipped past exactly the pages it exists to flag.
+    if (error) unreadable.push(name);
+    else if (!fm.description) missingDesc.push(name);
   }
 
-  if (missingDesc.length === 0) return [];
-  return [{
-    type: 'health',
-    message: `${wiki} wiki pages missing description: ${missingDesc.join(', ')}`,
-  }];
+  const issues = [];
+  if (missingDesc.length > 0) {
+    issues.push({
+      type: 'health',
+      message: `${wiki} wiki pages missing description: ${missingDesc.join(', ')}`,
+    });
+  }
+  if (unreadable.length > 0) {
+    issues.push({
+      type: 'health',
+      message: `${wiki} wiki pages with unparseable frontmatter (invisible to the index): ${unreadable.join(', ')}`,
+    });
+  }
+  return issues;
 }
 
 // ── Workspace source discovery ──────────────────────────────────────────────
