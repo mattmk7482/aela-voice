@@ -5,9 +5,10 @@
  * Emits additionalContext containing, in order:
  *   1. User name injection line (if personality.yaml exists)
  *   2. PLUGIN-FEATURES.md contents (if the file exists)
- *   3. Personal wiki index
- *   4. Project wiki index
- *   5. Five orientation pages in full: tasks-active, team-state,
+ *   3. Voice capabilities the configured TTS server actually reports
+ *   4. Personal wiki index
+ *   5. Project wiki index
+ *   6. Five orientation pages in full: tasks-active, team-state,
  *      working-preferences, user-profile, reflections
  *
  * Any of these sources that are absent are skipped entirely — no
@@ -19,7 +20,7 @@ import { readFileSync, existsSync } from 'fs';
 import { execSync } from 'child_process';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = join(__dirname, '..');
@@ -100,6 +101,41 @@ function readPluginFeatures() {
   return readFileSync(p, 'utf-8').trim();
 }
 
+// ── Voice capabilities ──────────────────────────────────────────────────────
+// Backend-dependent, so it is probed rather than documented statically: tags
+// are a Chatterbox feature and an XTTS server would read them aloud as text.
+// Injected only when the configured server actually renders them, so an XTTS
+// install never sees guidance it cannot use.
+
+async function readVoiceCapabilities() {
+  try {
+    const { getTtsUrl } = await import(
+      pathToFileURL(join(PLUGIN_ROOT, 'mcp-servers', 'tts', 'config.js')).href
+    );
+    const { paralinguisticTags } = await import(
+      pathToFileURL(join(PLUGIN_ROOT, 'mcp-servers', 'tts', 'backend.js')).href
+    );
+
+    const tags = await paralinguisticTags(getTtsUrl());
+    if (!tags.length) return null;
+
+    return [
+      '## Voice: paralinguistic tags',
+      '',
+      'The configured TTS server renders these inline, in **square** brackets — `[sigh]`, not',
+      '`<sigh>`, which is read aloud as literal text instead:',
+      '',
+      tags.map(t => `\`[${t}]\``).join(', '),
+      '',
+      'They go in `speak` text and pass through sentence splitting untouched. Use them **sparingly**',
+      'and only where the reaction is genuine — one in the right place reads as a person, one per',
+      'sentence reads as a soundboard. Most turns want none.',
+    ].join('\n');
+  } catch {
+    return null;
+  }
+}
+
 // ── Orientation page reads ───────────────────────────────────────────────────
 
 function readOrientationPage(name) {
@@ -140,15 +176,21 @@ if (features) {
   sections.push('# Plugin Features\n\n' + features);
 }
 
-// 3. Personal wiki index
+// 3. Voice capabilities — omitted entirely when the server renders no tags
+const voiceCapabilities = await readVoiceCapabilities();
+if (voiceCapabilities) {
+  sections.push(voiceCapabilities);
+}
+
+// 4. Personal wiki index
 const personalIndex = wikiList('personal');
 sections.push('## Personal wiki index\n\n' + personalIndex.trim());
 
-// 4. Project wiki index
+// 5. Project wiki index
 const projectIndex = wikiList('project');
 sections.push('## Project wiki index\n\n' + projectIndex.trim());
 
-// 5. Orientation pages — skip any page that doesn't exist yet
+// 6. Orientation pages — skip any page that doesn't exist yet
 const pageSections = ORIENTATION_PAGES
   .map(readOrientationPage)
   .filter(Boolean)

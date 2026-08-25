@@ -33,6 +33,28 @@ export async function outputGain(base) {
   return dbToGain(OUTPUT_GAIN_DB[await backendOf(base)] ?? 0);
 }
 
+/**
+ * Paralinguistic tags the configured server can render, e.g. ['laugh', 'sigh'].
+ * Chatterbox substitutes these for real sounds; XTTS has no equivalent and would
+ * read them aloud, so callers must ask rather than assume.
+ *
+ * Deliberately self-contained rather than going through backendOf(): this runs
+ * on the session-start path, where an unreachable server must cost a bounded
+ * wait and nothing else. Bounded by AbortSignal so the socket is actually
+ * cancelled — a hook with a dangling fetch stays alive until its own timeout.
+ * Fails closed to [], which reads as "no tags" rather than as an error.
+ */
+export async function paralinguisticTags(base, timeoutMs = 2500) {
+  try {
+    const res = await fetch(`${base}/api/model-info`, { signal: AbortSignal.timeout(timeoutMs) });
+    if (!res.ok) return [];
+    const info = await res.json();
+    return info.supports_paralinguistic_tags ? (info.available_paralinguistic_tags ?? []) : [];
+  } catch {
+    return [];
+  }
+}
+
 const stripWav = f => f.replace(/\.wav$/i, '');
 
 async function json(base, path) {
