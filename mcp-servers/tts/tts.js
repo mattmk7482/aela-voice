@@ -3,6 +3,8 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { playAndDelete } from './playback.js';
 import { getTtsUrl, getVoice } from './config.js';
+import { synthesize, outputGain } from './backend.js';
+import { applyGain } from './gain.js';
 
 // ── Sentence splitting ──────────────────────────────────────────────────────
 
@@ -30,18 +32,7 @@ export async function fetchTTS(text, voice, retries = 2) {
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const response = await fetch(`${ttsBase}/tts_to_audio/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Connection': 'close',
-        },
-        body: JSON.stringify({
-          text,
-          speaker_wav: `${voice}.wav`,
-          language: 'en',
-        }),
-      });
+      const response = await synthesize(ttsBase, { text, voice });
 
       if (!response.ok) {
         const body = await response.text().catch(() => '');
@@ -49,8 +40,9 @@ export async function fetchTTS(text, voice, retries = 2) {
       }
 
       const buffer = await response.arrayBuffer();
+      const audio = applyGain(Buffer.from(buffer), await outputGain(ttsBase));
       const tmpPath = join(tmpdir(), `tts-${Date.now()}-${Math.random().toString(36).slice(2)}.wav`);
-      writeFileSync(tmpPath, Buffer.from(buffer));
+      writeFileSync(tmpPath, audio);
       return tmpPath;
     } catch (err) {
       if (attempt === retries) throw err;

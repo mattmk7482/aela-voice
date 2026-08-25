@@ -10,6 +10,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { speak } from './tts.js';
+import { listSpeakers, uploadSample, getSettings, setSettings } from './backend.js';
 import { play } from './playback.js';
 import { getTtsUrl, getVoice, setVoice, setTtsUrl } from './config.js';
 import { readPersonality, writePersonality } from './personality.js';
@@ -158,9 +159,7 @@ async function handleTool(name, args) {
     }
 
     case 'list_voices': {
-      const res = await fetch(`${ttsBase}/speakers`);
-      if (!res.ok) throw new Error(`Failed to fetch speakers (${res.status})`);
-      const speakers = await res.json();
+      const speakers = await listSpeakers(ttsBase);
       const current = getVoice();
       const list = speakers.map(s => s.name === current ? `${s.name} (active)` : s.name).sort();
       return text(list.join('\n'));
@@ -183,25 +182,18 @@ async function handleTool(name, args) {
 
     case 'upload_voice_sample': {
       const fileData = readFileSync(args.file_path);
-      const formData = new FormData();
-      formData.append('wavFile', new Blob([fileData]), args.file_path.split(/[/\\]/).pop());
-      const res = await fetch(`${ttsBase}/upload_sample`, { method: 'POST', body: formData });
+      const fileName = args.file_path.split(/[/\\]/).pop();
+      const res = await uploadSample(ttsBase, fileName, fileData);
       if (!res.ok) throw new Error(`Upload failed (${res.status}): ${await res.text()}`);
       return text(`Uploaded: ${args.file_path}`);
     }
 
     case 'get_tts_settings': {
-      const res = await fetch(`${ttsBase}/get_tts_settings`);
-      if (!res.ok) throw new Error(`Failed (${res.status})`);
-      return text(JSON.stringify(await res.json(), null, 2));
+      return text(JSON.stringify(await getSettings(ttsBase), null, 2));
     }
 
     case 'set_tts_settings': {
-      const res = await fetch(`${ttsBase}/set_tts_settings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(args),
-      });
+      const res = await setSettings(ttsBase, args);
       if (!res.ok) throw new Error(`Failed (${res.status}): ${await res.text()}`);
       return text('TTS settings updated.');
     }

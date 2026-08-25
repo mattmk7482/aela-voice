@@ -1,7 +1,7 @@
 {
   "name": "aela-voice",
-  "version": "2.0.4",
-  "description": "Give Claude a voice and companion personality. Ships with Aela — warm, direct, invested in your work. Backed by any XTTS-compatible TTS server.",
+  "version": "2.1.0",
+  "description": "Give Claude a voice and companion personality. Ships with Aela — warm, direct, invested in your work. Backed by any XTTS-compatible or Chatterbox TTS server.",
   "author": {
     "name": "Matt Bushell"
   },

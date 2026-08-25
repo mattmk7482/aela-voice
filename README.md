@@ -20,7 +20,7 @@ Then install the plugin:
 
 - **Claude Code** installed and running
 - **Node.js 20+**
-- **An XTTS-compatible TTS server** reachable from the machine running Claude Code ([AllTalk](https://github.com/erew123/alltalk_tts), vanilla XTTS, etc.)
+- **A TTS server** reachable from the machine running Claude Code — either XTTS-compatible ([AllTalk](https://github.com/erew123/alltalk_tts), vanilla XTTS, etc.) or [Chatterbox](https://github.com/devnen/Chatterbox-TTS-Server). The plugin detects which one it is talking to and adapts.
 - **Chrome** with the [Claude in Chrome](https://chromewebstore.google.com/detail/claude-in-chrome/fkeaobmnlgofdpbpnaijafahpgiacmoi) extension, if you want communication monitoring
 
 ## Setup
@@ -30,7 +30,7 @@ Run `/aela-init` on your first session. Five questions:
 1. **Companion name** — what to call the assistant (default: Aela)
 2. **Your name** — what the companion calls you
 3. **What you do** — one-liner about your work, seeds your profile
-4. **TTS server URL** — where your XTTS server lives
+4. **TTS server URL** — where your TTS server lives
 5. **Voice** — pick from available voices or upload your own
 
 After that, `/aela-init` offers to chain into `/wiki-init` (persistent memory) and `/comms-init` (communication monitoring). Each step is optional — stop wherever you like.

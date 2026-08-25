@@ -40,7 +40,7 @@ Store the answer as prose inside the `user-profile` contract page when `/wiki-in
 
 ### Question 4 — Where is your TTS server?
 
-The voice features require an XTTS-compatible TTS server. Ask the user for the URL (e.g. `http://192.168.1.247:8020` or `http://localhost:8020`).
+The voice features require a TTS server — either XTTS-compatible or Chatterbox. The plugin probes the URL and adapts, so just ask the user for it (e.g. `http://192.168.1.247:8020` or `http://localhost:8004`).
 
 Call `set_tts_url` (the TTS MCP tool) with the URL. This persists it to plugin config immediately — Question 5 needs a working TTS connection to list voices.
 
