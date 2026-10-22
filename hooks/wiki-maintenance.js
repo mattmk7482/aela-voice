@@ -4,7 +4,8 @@
  *
  * Discovers source docs in the workspace by glob, filters by git
  * authorship (keeps untracked files and files last-committed by the
- * current user), detects external wikis in sibling projects, and
+ * current user), detects external wikis in sibling projects (skipping
+ * worktrees of the current project's repo), and
  * reports wiki health issues (pages missing description frontmatter).
  *
  * Writes a plain markdown maintenance report to stdout. Claude reads
@@ -15,6 +16,7 @@
 
 import { readdirSync, existsSync } from 'fs';
 import { basename, join, resolve } from 'path';
+import { execFileSync } from 'child_process';
 
 import { readSources, checkWikiHealth, discoverWorkspaceSources } from '../mcp-servers/wiki/store.js';
 
@@ -53,6 +55,26 @@ function checkSources() {
 
 // ── External wiki detection ──────────────────────────────────────────────────
 
+// The shared .git directory of the repo `dir` is the root of — the one thing
+// every worktree of a repo has in common. null when `dir` is not itself a repo
+// root or worktree: without its own .git, git would walk up and could answer
+// for an unrelated parent repo.
+function gitCommonDir(dir) {
+  if (!existsSync(join(dir, '.git'))) return null;
+  try {
+    const out = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
+      cwd: dir,
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 5000,
+    }).trim();
+    const abs = resolve(out);
+    return process.platform === 'win32' ? abs.toLowerCase() : abs;
+  } catch {
+    return null;
+  }
+}
+
 function checkExternalWikis() {
   const sources = readSources();
   const ingestedIds = new Set(sources.filter(s => s.ingested).map(s => s.path));
@@ -63,13 +85,17 @@ function checkExternalWikis() {
   // The current project's own .aela/wiki is the project wiki being used in
   // this session — not external to the work. Skip it from the sibling scan
   // or it gets flagged every session as a "new external wiki".
+  // Likewise a git worktree of the current project: its .aela/wiki is this
+  // same wiki on another branch, which reaches this one by merging, not ingest.
   const currentProject = basename(process.cwd());
+  const currentRepo = gitCommonDir(process.cwd());
 
   for (const entry of readdirSync(WORKSPACE_ROOT, { withFileTypes: true })) {
     if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
     if (entry.name === currentProject) continue;
     const wikiPath = join(WORKSPACE_ROOT, entry.name, '.aela', 'wiki');
     if (!existsSync(wikiPath)) continue;
+    if (currentRepo && gitCommonDir(join(WORKSPACE_ROOT, entry.name)) === currentRepo) continue;
 
     const portalId = `${entry.name}/.aela/wiki`;
     if (!ingestedIds.has(portalId)) {
