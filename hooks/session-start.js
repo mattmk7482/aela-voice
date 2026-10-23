@@ -1,21 +1,20 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, readdirSync } from 'fs';
-import { execSync } from 'child_process';
 import { homedir } from 'os';
 import { dirname, join } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
+import { ensureDeps } from '../lib/ensure-deps.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = join(__dirname, '..');
 const MCP_DIR = join(PLUGIN_ROOT, 'mcp-servers', 'tts');
 
 // ── 1. Ensure node_modules ──────────────────────────────────────────────────
+// personality.js (step 3) imports yaml from the TTS server's node_modules,
+// which the server's own launcher may be installing at this moment. Best
+// effort — if the install fails, that import throws.
 
-if (!existsSync(join(MCP_DIR, 'node_modules'))) {
-  try {
-    execSync('npm install --omit=dev', { cwd: MCP_DIR, stdio: 'ignore', timeout: 25000 });
-  } catch { /* best effort */ }
-}
+ensureDeps(MCP_DIR, { timeout: 25000 });
 
 // ── 2. Provision voices ─────────────────────────────────────────────────────
 // Push any locally-held voice sample the TTS server is missing. Covers every

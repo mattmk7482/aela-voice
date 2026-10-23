@@ -17,8 +17,15 @@
 import { readdirSync, existsSync } from 'fs';
 import { basename, join, resolve } from 'path';
 import { execFileSync } from 'child_process';
+import { fileURLToPath } from 'url';
+import { ensureDeps } from '../lib/ensure-deps.js';
 
-import { readSources, checkWikiHealth, discoverWorkspaceSources } from '../mcp-servers/wiki/store.js';
+// The wiki store imports yaml from the wiki server's node_modules, which that
+// server's launcher may be installing at this moment. Best effort — if the
+// install fails, the import below throws.
+ensureDeps(fileURLToPath(new URL('../mcp-servers/wiki', import.meta.url)), { timeout: 8000 });
+
+const { readSources, checkWikiHealth, discoverWorkspaceSources } = await import('../mcp-servers/wiki/store.js');
 
 const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || resolve(process.cwd(), '..');
 

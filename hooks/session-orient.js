@@ -17,31 +17,24 @@
  */
 
 import { readFileSync, existsSync } from 'fs';
-import { execSync } from 'child_process';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { fileURLToPath, pathToFileURL } from 'url';
+import { ensureDeps } from '../lib/ensure-deps.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = join(__dirname, '..');
 
-// ── Bootstrap: ensure hooks' node_modules exists ────────────────────────────
-// Matches the TTS server's start.js pattern. On a fresh install, node_modules
-// is absent until the first invocation runs npm install. Best effort — if npm
-// fails, the subsequent yaml import will throw a clear error.
-// stdio: 'ignore' because this hook's stdout must stay a single clean JSON line.
+// ── Bootstrap: ensure dependencies ──────────────────────────────────────────
+// yaml comes from hooks' own node_modules; the wiki store imports yaml from
+// the wiki server's, which that server's launcher may be installing at this
+// moment. Best effort — if an install fails, the import below throws.
+// ensureDeps writes only to stderr, so this hook's stdout stays one JSON line.
 
-if (!existsSync(join(__dirname, 'node_modules'))) {
-  try {
-    execSync('npm install --omit=dev', {
-      cwd: __dirname,
-      stdio: 'ignore',
-      timeout: 25000,
-    });
-  } catch { /* best effort */ }
-}
+ensureDeps(__dirname, { timeout: 12000 });
+ensureDeps(join(PLUGIN_ROOT, 'mcp-servers', 'wiki'), { timeout: 12000 });
 
-// Now that deps are guaranteed installed, dynamically import yaml and the
+// Now that deps are installed, dynamically import yaml and the
 // wiki store. Static imports can't be used here because the bootstrap above
 // might need to run before yaml is available on disk.
 

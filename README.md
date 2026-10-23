@@ -80,7 +80,7 @@ The companion also acts on its own: persisting decisions to wiki, scanning comms
 
 **check-comms says "no comms configured"** — run `/comms-init` to set up at least one service.
 
-**Session-orient hook timed out on first run** — run `cd <plugin>/hooks && npm install` manually, then restart Claude Code. First-run npm installs can be slow.
+**A hook or the TTS/wiki server fails on the first session after installing or updating** — each plugin version installs its npm dependencies on first launch, which can be slow on a cold npm cache. Restart Claude Code (or reconnect the server from `/mcp`): an incomplete install is detected and replaced. Why a launch failed is on stderr, as `aela-voice: dependencies in <dir> are not installed: …`.
 
 ## License
 
